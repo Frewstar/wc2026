@@ -194,6 +194,11 @@ function PickForm({
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
+  // Joker — player-controlled during knockout rounds
+  const jokerPlayedHere = entry?.joker_round === round.num
+  const jokerPlayedElsewhere = Boolean(entry?.joker_used && !jokerPlayedHere)
+  const [joker, setJoker] = useState(Boolean(jokerPlayedHere))
+
   const isEditing = Boolean(existingTeam)
   const showGoldenGoal = isR1 && entry?.golden_goal == null
   const countdown = useCountdown(Date.now() + deadlineMs)
@@ -257,6 +262,7 @@ function PickForm({
           team,
           my_goals: myGoals,
           opp_goals: oppGoals,
+          joker: isKnockoutRound ? joker : false,
           ...(showGoldenGoal && goldenGoal !== '' ? { golden_goal: parseInt(goldenGoal) || 0 } : {}),
         }),
       })
@@ -395,16 +401,44 @@ function PickForm({
         </div>
       )}
 
-      {/* Joker status — view only, assigned by admin */}
-      {isKnockoutRound && entry?.joker_used && (
+      {/* Joker — player-controlled toggle (knockout rounds only) */}
+      {isKnockoutRound && !jokerPlayedElsewhere && (
+        <button
+          type="button"
+          onClick={() => setJoker(!joker)}
+          className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all text-left ${
+            joker
+              ? 'bg-amber-500/15 border-amber-500/40'
+              : 'bg-surface border-theme hover:bg-surface-hover'
+          }`}
+        >
+          <span className="text-xl leading-none">🃏</span>
+          <div className="flex-1 min-w-0">
+            <p className={`text-sm font-semibold leading-tight ${joker ? 'text-amber-300' : 'text-ink-muted'}`}>
+              Play my Joker this round
+            </p>
+            <p className="text-xs text-ink-faint mt-0.5">
+              Doubles your points — one use only, can&apos;t be changed after kick-off
+            </p>
+          </div>
+          {/* Checkbox visual */}
+          <div className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition-all ${
+            joker ? 'bg-amber-400 border-amber-400' : 'border-ink-faint'
+          }`}>
+            {joker && (
+              <svg className="w-3 h-3 text-black" fill="none" viewBox="0 0 12 12" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" d="M2 6l3 3 5-5" />
+              </svg>
+            )}
+          </div>
+        </button>
+      )}
+
+      {/* Joker already played on a different round */}
+      {isKnockoutRound && jokerPlayedElsewhere && (
         <div className="flex items-center gap-2 bg-amber-500/10 border border-amber-500/30 rounded-xl px-4 py-2.5 text-xs text-amber-300">
           <span>🃏</span>
-          <span>
-            {entry.joker_round === round.num
-              ? 'Joker assigned to this round — points will be doubled!'
-              : `Joker assigned to ${ROUNDS.find(r => r.num === entry.joker_round)?.label ?? `Round ${entry.joker_round}`}`
-            }
-          </span>
+          <span>Joker played on {ROUNDS.find(r => r.num === entry?.joker_round)?.label ?? `Round ${entry?.joker_round}`}</span>
         </div>
       )}
 

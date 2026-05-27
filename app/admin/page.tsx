@@ -9,7 +9,7 @@ import { toUKInputValue, fromUKInputValue } from '@/lib/uk-time'
 import { ROUNDS, pickField } from '@/lib/rounds'
 import { PageHeader, SegmentedControl } from '@/components/ui'
 
-type Tab = 'access' | 'players' | 'entries' | 'fixtures' | 'results' | 'settings'
+type Tab = 'access' | 'players' | 'entries' | 'fixtures' | 'results' | 'settings' | 'help'
 type Player = { id: string; name: string }
 type Participant = {
   id: string
@@ -385,6 +385,7 @@ export default function AdminPage() {
     { key: 'fixtures', label: 'Fixtures' },
     { key: 'results', label: 'Results' },
     { key: 'settings', label: 'Settings' },
+    { key: 'help', label: '❓ Help' },
   ]
 
   if (!unlocked) return (
@@ -721,13 +722,13 @@ export default function AdminPage() {
                         <button onClick={() => deleteEntry(e.id)} className="text-red-400/70 text-xs hover:text-red-400 transition-colors">Remove</button>
                       </div>
                     </div>
-                    {/* Joker management — knockout rounds only */}
+                    {/* Joker status — player-managed, admin can remove if needed */}
                     <div className="flex items-center gap-2 pt-1.5 border-t border-white/[0.04]">
                       <span className="text-[11px] text-ink-faint shrink-0">🃏 Joker:</span>
                       {e.joker_used ? (
                         <div className="flex items-center gap-2">
                           <span className="text-[11px] font-semibold text-amber-400">
-                            {jokerRoundDef ? jokerRoundDef.label : `R${e.joker_round}`}
+                            Played — {jokerRoundDef ? jokerRoundDef.label : `R${e.joker_round}`}
                           </span>
                           <button
                             onClick={() => setJoker(e.id, null)}
@@ -737,18 +738,7 @@ export default function AdminPage() {
                           </button>
                         </div>
                       ) : (
-                        <select
-                          value=""
-                          onChange={ev => ev.target.value && setJoker(e.id, parseInt(ev.target.value))}
-                          className="input-field-sm text-[11px] py-0.5 flex-1 max-w-[200px]"
-                        >
-                          <option value="">— assign knockout round —</option>
-                          <option value="4">Last 32 (R4)</option>
-                          <option value="5">Last 16 (R5)</option>
-                          <option value="6">Quarter-final (R6)</option>
-                          <option value="7">Semi-final (R7)</option>
-                          <option value="8">Final (R8)</option>
-                        </select>
+                        <span className="text-[11px] text-ink-faint italic">Not used — player chooses</span>
                       )}
                     </div>
                   </div>
@@ -1192,6 +1182,137 @@ export default function AdminPage() {
               Update Password
             </button>
           </div>
+        </div>
+      )}
+
+      {tab === 'help' && (
+        <div className="space-y-4">
+
+          {/* Quick summary */}
+          <div className="glass-card p-5 border border-pitch/20">
+            <p className="text-sm font-semibold text-ink mb-1">👋 Hi Jim!</p>
+            <p className="text-xs text-ink-muted leading-relaxed">
+              This guide covers everything you need to run each round. Most of your work happens in the <strong className="text-ink">Results</strong> tab (entering scores) and <strong className="text-ink">Settings</strong> tab (opening rounds). Everything else is self-explanatory but it&apos;s all covered below.
+            </p>
+          </div>
+
+          {/* Before the tournament */}
+          <div className="glass-card p-5">
+            <p className="text-sm font-semibold text-pitch-light mb-3">🚀 Before the tournament starts (one-off)</p>
+            <div className="space-y-3">
+              {[
+                { n: '1', title: 'Seed the fixtures', body: 'Go to the Fixtures tab → click "Seed all 72 group fixtures". This loads all group stage matches with kick-off times automatically. Only needs doing once.' },
+                { n: '2', title: 'Check deadlines are set', body: 'Go to Settings → Pick deadlines. These should auto-fill after seeding. They control when each round locks — picks are blocked after the deadline.' },
+                { n: '3', title: 'Open Round 1', body: 'Go to Settings → Current round → select "Group Matchday 1" → save. This opens the pick form for all participants.' },
+                { n: '4', title: 'Confirm participants are paid', body: 'Go to Players tab. Anyone in the Awaiting Payment section needs to be confirmed before the tournament starts or they\'ll be excluded from the leaderboard.' },
+              ].map(step => (
+                <div key={step.n} className="flex gap-3">
+                  <span className="flex-shrink-0 w-6 h-6 rounded-full bg-pitch-muted text-pitch-light text-xs font-bold flex items-center justify-center">{step.n}</span>
+                  <div>
+                    <p className="text-sm font-semibold text-ink">{step.title}</p>
+                    <p className="text-xs text-ink-muted mt-0.5 leading-relaxed">{step.body}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Each round */}
+          <div className="glass-card p-5">
+            <p className="text-sm font-semibold text-ink mb-3">🔁 Every round — what to do</p>
+
+            <div className="space-y-4">
+              <div>
+                <p className="text-xs font-semibold text-pitch-light uppercase tracking-wide mb-2">A few days before kick-off</p>
+                <div className="space-y-2 pl-3 border-l-2 border-pitch/20">
+                  <p className="text-xs text-ink-muted leading-relaxed">
+                    Go to <strong className="text-ink">Settings → Current round</strong> and select the upcoming round. This opens the pick form so participants can start making their picks.
+                  </p>
+                  <p className="text-xs text-ink-muted leading-relaxed">
+                    Send a reminder email from <strong className="text-ink">Settings → Send round reminder</strong> if you want to nudge anyone who hasn&apos;t picked yet.
+                  </p>
+                </div>
+              </div>
+
+              <div>
+                <p className="text-xs font-semibold text-amber-400 uppercase tracking-wide mb-2">~1 hour before kick-off</p>
+                <div className="space-y-2 pl-3 border-l-2 border-amber-500/20">
+                  <p className="text-xs text-ink-muted leading-relaxed">
+                    Go to <strong className="text-ink">Settings → Reveal picks</strong> and click <strong className="text-ink">Reveal</strong> for that round. This shows everyone&apos;s picks on the leaderboard. Do this just before kick-off so nobody copies each other.
+                  </p>
+                </div>
+              </div>
+
+              <div>
+                <p className="text-xs font-semibold text-emerald-400 uppercase tracking-wide mb-2">After the matches finish</p>
+                <div className="space-y-2 pl-3 border-l-2 border-emerald-500/20">
+                  <p className="text-xs text-ink-muted leading-relaxed">
+                    Go to the <strong className="text-ink">Results tab</strong>, select the round, and enter the final score for each match. Hit <strong className="text-ink">Save</strong> after each one. Points update on the leaderboard instantly.
+                  </p>
+                  <p className="text-xs text-ink-muted leading-relaxed">
+                    Or hit <strong className="text-ink">Sync now</strong> — this pulls scores from the football API automatically if the matches are finished.
+                  </p>
+                </div>
+              </div>
+
+              <div>
+                <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-2">Knockout rounds only (Round 4–8)</p>
+                <div className="space-y-2 pl-3 border-l-2 border-white/10">
+                  <p className="text-xs text-ink-muted leading-relaxed">
+                    Go to the <strong className="text-ink">Entries tab</strong>. Each player has a 🃏 Joker row — use the dropdown to assign which round their joker is played on. The player gets an email automatically. Each player can only have one joker.
+                  </p>
+                  <p className="text-xs text-ink-muted leading-relaxed">
+                    For knockout matches that go to penalties, enter the score at 90 minutes in the score fields, then select the winning team in the <strong className="text-ink">Winner (if pens)</strong> dropdown.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Tab guide */}
+          <div className="glass-card p-5">
+            <p className="text-sm font-semibold text-ink mb-3">📖 What each tab does</p>
+            <div className="space-y-3">
+              {[
+                { tab: 'Players', icon: '👥', desc: 'See who has registered and who has paid. Click "Confirm Payment" to approve someone and send them their personal picks link by email.' },
+                { tab: 'Entries', icon: '📝', desc: 'View all picks across every round. Assign or remove jokers for knockout rounds. Export to CSV spreadsheet as a backup.' },
+                { tab: 'Fixtures', icon: '📅', desc: 'The list of matches for each round. Seed all 72 group games with one button. Knockout fixtures get added automatically as teams progress.' },
+                { tab: 'Results', icon: '⚽', desc: 'Enter final scores after each round. Use "Sync now" to pull scores from the API automatically. Points update on the leaderboard the moment you save.' },
+                { tab: 'Settings', icon: '⚙️', desc: 'Open/close rounds, set pick deadlines, reveal picks before kick-off, send reminder emails, set the Golden Goal total at the end, and manage the admin password.' },
+                { tab: 'Access', icon: '🔐', desc: 'Manually mark entries as paid or unpaid. Useful if someone paid outside the normal flow.' },
+              ].map(item => (
+                <div key={item.tab} className="flex gap-3">
+                  <span className="text-base shrink-0 mt-0.5">{item.icon}</span>
+                  <div>
+                    <p className="text-sm font-semibold text-ink">{item.tab}</p>
+                    <p className="text-xs text-ink-muted mt-0.5 leading-relaxed">{item.desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* FAQ */}
+          <div className="glass-card p-5">
+            <p className="text-sm font-semibold text-ink mb-3">❓ Quick answers</p>
+            <div className="space-y-3">
+              {[
+                { q: 'Someone hasn\'t picked — what do I do?', a: 'Go to Settings → Send round reminder. It automatically emails everyone who hasn\'t picked for that round. You can also copy their personal link from the Players tab and send it manually.' },
+                { q: 'The deadline passed but someone wants to change their pick', a: 'You can\'t override this — picks are locked at the deadline. This is intentional to keep the competition fair.' },
+                { q: 'A match went to penalties — how do I enter it?', a: 'In the Results tab, enter the score at 90 minutes (e.g. 1–1), then select the winning team in the "Winner (if pens)" dropdown that appears for knockout rounds.' },
+                { q: 'How do I assign a joker to someone?', a: 'Go to Entries tab. Find the player and use the "🃏 Joker" dropdown to pick which knockout round they\'re playing it on. They\'ll get an email straight away.' },
+                { q: 'Someone wants to know their picks link', a: 'Go to Players tab → find them in the Paid section → click 📋 Copy link. You can paste it to them directly. Or click 📧 Resend to email it to them again.' },
+                { q: 'How does the Golden Goal work?', a: 'Each player predicted the total goals in the whole tournament before Round 1. It\'s only used as a tiebreaker at the very end if two players finish level on points. Enter the actual total in Settings → Golden Goal once the Final is done.' },
+                { q: 'The leaderboard isn\'t updating', a: 'It auto-refreshes every 25 seconds. If scores seem wrong, go to Results tab and hit "Sync now" to pull the latest data from the football API.' },
+              ].map(item => (
+                <div key={item.q} className="border-t border-theme pt-3 first:border-t-0 first:pt-0">
+                  <p className="text-xs font-semibold text-ink mb-1">{item.q}</p>
+                  <p className="text-xs text-ink-muted leading-relaxed">{item.a}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
         </div>
       )}
     </div>
