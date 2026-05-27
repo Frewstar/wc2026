@@ -392,6 +392,13 @@ export default function PickPage() {
 
   useEffect(() => { loadData() }, [loadData])
 
+  // Persist token so "My Picks" button works from other pages
+  useEffect(() => {
+    if (token) {
+      try { localStorage.setItem('my_picks_token', token) } catch {}
+    }
+  }, [token])
+
   const handlePickSuccess = (updated: Entry) => {
     setEntry(updated)
     setPickSuccess(true)

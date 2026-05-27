@@ -1,6 +1,7 @@
 import { TeamFlag } from './TeamFlag'
 import { APP_SHORT } from '@/lib/app-config'
 import { getTeamGroup } from '@/lib/wc-groups'
+import { MyPicksButton } from './MyPicksButton'
 
 const HOST_NATIONS = ['USA', 'Mexico', 'Canada']
 const FEATURED_TEAM = 'Scotland'
@@ -74,12 +75,19 @@ export function HeroBanner() {
 
 export function CompactHeader() {
   return (
-    <header className="text-center mb-8 animate-fade-in">
-      <p className="section-label mb-2">{APP_SHORT}</p>
-      <h1 className="font-display text-xl font-bold tracking-tight text-ink">
-        Juggs <span className="text-gold">World Cup</span>
-      </h1>
-      <div className="gold-accent-line mt-4 max-w-[80px] mx-auto" />
+    <header className="mb-8 animate-fade-in">
+      <div className="flex items-center justify-between mb-1">
+        <MyPicksButton />
+        <div className="flex-1 text-center">
+          <p className="section-label mb-1">{APP_SHORT}</p>
+          <h1 className="font-display text-xl font-bold tracking-tight text-ink">
+            Juggs <span className="text-gold">World Cup</span>
+          </h1>
+        </div>
+        {/* spacer to keep title centred when button is present */}
+        <div className="w-[80px]" />
+      </div>
+      <div className="gold-accent-line mt-3 max-w-[80px] mx-auto" />
     </header>
   )
 }
