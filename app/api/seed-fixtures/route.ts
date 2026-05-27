@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { WC2026_GROUP_FIXTURES } from '@/lib/wc2026-fixtures'
 import { requireAdmin } from '@/lib/admin-auth'
+import { computeDeadlinesFromFixtures, mergeDeadlines, parseDeadlines } from '@/lib/round-deadlines'
 
 export async function POST(req: NextRequest) {
   const auth = await requireAdmin(req)
@@ -58,9 +59,17 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // Auto-compute and save R1-R3 deadlines from fixture kick-off times
+  const computed = computeDeadlinesFromFixtures(WC2026_GROUP_FIXTURES)
+  const { data: settings } = await supabaseAdmin.from('settings').select('round_deadlines').single()
+  const existing = parseDeadlines(settings?.round_deadlines)
+  const merged = mergeDeadlines(existing, computed)
+  await supabaseAdmin.from('settings').update({ round_deadlines: JSON.stringify(merged) }).eq('id', 1)
+
   return NextResponse.json({
     upserted,
     total: WC2026_GROUP_FIXTURES.length,
     errors: errors.length > 0 ? errors : undefined,
+    deadlines_updated: Object.keys(computed).length,
   })
 }

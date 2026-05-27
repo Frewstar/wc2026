@@ -50,3 +50,27 @@ export function mergeDeadlines(
   }
   return merged
 }
+
+/**
+ * Compute per-round deadlines from fixture kick-off times.
+ * Deadline = 1 hour before the earliest kick-off in each round.
+ * Fixtures with no kick-off are skipped.
+ */
+export function computeDeadlinesFromFixtures(
+  fixtures: Array<{ round: number; kickoff?: string | null }>
+): RoundDeadlines {
+  const earliest: Record<string, string> = {}
+  for (const fx of fixtures) {
+    if (!fx.kickoff) continue
+    const key = String(fx.round)
+    if (!earliest[key] || fx.kickoff < earliest[key]) {
+      earliest[key] = fx.kickoff
+    }
+  }
+  const deadlines: RoundDeadlines = {}
+  for (const [round, iso] of Object.entries(earliest)) {
+    const ms = new Date(iso).getTime() - 60 * 60 * 1000 // 1 hour before
+    deadlines[round] = new Date(ms).toISOString()
+  }
+  return deadlines
+}

@@ -51,6 +51,9 @@ export default function AdminPage() {
   const [seeding, setSeeding] = useState(false)
   const [autoSync, setAutoSync] = useState(false)
   const [lastSynced, setLastSynced] = useState<string | null>(null)
+  const [demoSeeding, setDemoSeeding] = useState(false)
+  const [demoPickUrl, setDemoPickUrl] = useState<string | null>(null)
+  const [demoClearing, setDemoClearing] = useState(false)
   const autoSyncRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const [toast, setToast] = useState('')
   const [winnerEdits, setWinnerEdits] = useState<Record<string, string>>({})
@@ -279,6 +282,31 @@ export default function AdminPage() {
     } else {
       showToast(`Seeded ${data.inserted} fixtures (${data.skipped} already existed)`)
     }
+  }
+
+  const seedDemo = async () => {
+    setDemoSeeding(true)
+    const res = await adminFetch('/api/admin/seed-demo', { method: 'POST' })
+    const data = await res.json()
+    await loadAll()
+    setDemoSeeding(false)
+    if (data.tester_pick_url) setDemoPickUrl(data.tester_pick_url)
+    showToast(`Demo seeded: ${(data.created ?? []).join(', ')}`)
+  }
+
+  const clearDemo = async () => {
+    if (!window.confirm('This will delete ALL entries, participants and results and cannot be undone. Continue?')) return
+    setDemoClearing(true)
+    const res = await adminFetch('/api/admin/clear-demo', {
+      method: 'POST',
+      body: JSON.stringify({ confirm: 'CLEAR_DEMO' }),
+    })
+    const data = await res.json()
+    await loadAll()
+    setDemoClearing(false)
+    setDemoPickUrl(null)
+    showToast('Demo data cleared — ready for real players')
+    console.log('clear-demo result:', data)
   }
 
   const buildKnockout = async () => {
@@ -1208,6 +1236,51 @@ export default function AdminPage() {
             <p className="text-xs text-ink-muted leading-relaxed">
               This guide covers everything you need to run each round. Most of your work happens in the <strong className="text-ink">Results</strong> tab (entering scores) and <strong className="text-ink">Settings</strong> tab (opening rounds). Everything else is self-explanatory but it&apos;s all covered below.
             </p>
+          </div>
+
+          {/* Demo / testing */}
+          <div className="glass-card p-5 border border-amber-500/20">
+            <p className="text-sm font-semibold text-amber-400 mb-1">🧪 Test the full competition</p>
+            <p className="text-xs text-ink-muted mb-4 leading-relaxed">
+              Seeds 5 ghost players with pre-filled picks so you can run through every round end-to-end.
+              A <strong className="text-ink">"You (Demo)"</strong> account is also created — use its link to make your own picks.
+              When you&apos;re happy everything works, hit <strong className="text-ink">Clear demo data</strong> to wipe all test entries and start fresh with real players.
+            </p>
+            <div className="flex gap-3 mb-3">
+              <button
+                onClick={seedDemo}
+                disabled={demoSeeding}
+                className="btn-primary flex-1 text-sm py-2.5 disabled:opacity-50"
+              >
+                {demoSeeding ? 'Seeding…' : '🌱 Seed demo data'}
+              </button>
+              <button
+                onClick={clearDemo}
+                disabled={demoClearing}
+                className="flex-1 text-sm py-2.5 rounded-xl border border-red-500/40 text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50"
+              >
+                {demoClearing ? 'Clearing…' : '🗑️ Clear demo data'}
+              </button>
+            </div>
+            {demoPickUrl && (
+              <div className="rounded-xl bg-pitch-muted/40 px-4 py-3 flex items-center gap-3">
+                <span className="text-xs text-ink-muted shrink-0">Your pick link:</span>
+                <a
+                  href={demoPickUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-pitch-light font-mono truncate hover:underline"
+                >
+                  {demoPickUrl}
+                </a>
+                <button
+                  onClick={() => { navigator.clipboard.writeText(window.location.origin + demoPickUrl); showToast('Copied!') }}
+                  className="text-xs text-ink-faint hover:text-ink shrink-0"
+                >
+                  📋
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Before the tournament */}
