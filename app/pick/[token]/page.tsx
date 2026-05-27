@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import {
@@ -198,6 +198,25 @@ function PickForm({
   const showGoldenGoal = isR1 && entry?.golden_goal == null
   const countdown = useCountdown(Date.now() + deadlineMs)
 
+  // Scroll-to-score behaviour
+  const scorePredictionRef = useRef<HTMLDivElement>(null)
+  const [showScrollCue, setShowScrollCue] = useState(false)
+  const isInitialRender = useRef(true)
+
+  useEffect(() => {
+    // Skip the very first render (pre-filled existing pick)
+    if (isInitialRender.current) { isInitialRender.current = false; return }
+    if (!team) { setShowScrollCue(false); return }
+
+    const scrollTimer = setTimeout(() => {
+      scorePredictionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 80)
+    setShowScrollCue(true)
+    const cueTimer = setTimeout(() => setShowScrollCue(false), 3000)
+
+    return () => { clearTimeout(scrollTimer); clearTimeout(cueTimer) }
+  }, [team])
+
   // Fixtures for this round
   const roundFixtures = fixtures.filter(fx => fx.round === round.num)
 
@@ -306,9 +325,19 @@ function PickForm({
         )}
       </div>
 
+      {/* Scroll cue — animated prompt between fixture list and score section */}
+      {team && showScrollCue && (
+        <div className="flex flex-col items-center gap-1 py-1 pointer-events-none score-cue-enter">
+          <span className="text-xs font-semibold text-pitch-light">Predict the score below</span>
+          <svg className="w-4 h-4 text-pitch-light" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+          </svg>
+        </div>
+      )}
+
       {/* Score prediction — appears once a team is selected */}
       {team && (
-        <div className="rounded-2xl border border-pitch/30 bg-surface p-4">
+        <div ref={scorePredictionRef} className="rounded-2xl border border-pitch/30 bg-surface p-4 scroll-mt-4">
           <p className="section-label mb-4 text-center block">Predicted score</p>
           <div className="flex items-center justify-center gap-4">
             {/* My team */}
@@ -317,11 +346,11 @@ function PickForm({
               <span className="text-[11px] font-medium text-ink text-center leading-tight max-w-[64px]">{team}</span>
             </div>
 
-            <GoalStepper value={myGoals} onChange={setMyGoals} />
+            <GoalStepper value={myGoals} onChange={v => { setMyGoals(v); setShowScrollCue(false) }} />
 
             <span className="text-ink-faint font-bold text-xl">–</span>
 
-            <GoalStepper value={oppGoals} onChange={setOppGoals} />
+            <GoalStepper value={oppGoals} onChange={v => { setOppGoals(v); setShowScrollCue(false) }} />
 
             {/* Opponent */}
             <div className="flex flex-col items-center gap-1 min-w-[60px]">
