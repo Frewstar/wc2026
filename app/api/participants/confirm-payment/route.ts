@@ -123,7 +123,7 @@ export async function POST(req: NextRequest) {
 
   // Send email via Resend
   const { error: emailErr } = await resend.emails.send({
-    from: 'onboarding@resend.dev',
+    from: 'WC2026 <picks@frewstar.co.uk>',
     to: participant.email,
     subject: "⚽ You're in! Your Juggs World Cup 2026 link",
     html: buildEmailHtml(participant.name, link),

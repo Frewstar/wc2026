@@ -133,7 +133,7 @@ export async function POST(req: NextRequest) {
   const results = await Promise.allSettled(
     needsReminder.map(p =>
       resend.emails.send({
-        from: 'onboarding@resend.dev',
+        from: 'WC2026 <picks@frewstar.co.uk>',
         to: p.email,
         subject: `⏰ ${roundDef.label} is open — make your pick!`,
         html: buildReminderHtml(
