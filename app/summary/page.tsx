@@ -5,7 +5,7 @@ import { calcPoints, isPickRevealed, type Entry, type Result, type Settings } fr
 import { ROUNDS, pickField } from '@/lib/rounds'
 import { PageHeader, LoadingState, EmptyState, SegmentedControl } from '@/components/ui'
 import { IconLock } from '@/components/icons'
-import { TeamLabel } from '@/components/TeamFlag'
+import { TeamFlag } from '@/components/TeamFlag'
 
 type RoundRow = {
   name: string
@@ -13,6 +13,7 @@ type RoundRow = {
   predicted: string
   actual: string
   pts: number
+  joker: boolean
 }
 
 export default function SummaryPage() {
@@ -46,7 +47,7 @@ export default function SummaryPage() {
         const bd = rounds[r]
         const result = results.find(x => x.round === r && (x.home_team === team || x.away_team === team))
         const actual = result != null ? `${result.home_goals}–${result.away_goals}` : 'TBC'
-        return { name: e.name, team, predicted: `${myG}–${oppG}`, actual, pts: bd.pts }
+        return { name: e.name, team, predicted: `${myG}–${oppG}`, actual, pts: bd.pts, joker: bd.joker ?? false }
       })
       .filter((x): x is RoundRow => x !== null)
       .sort((a, b) => b.pts - a.pts)
@@ -58,10 +59,18 @@ export default function SummaryPage() {
   const rows = getRoundRows(round)
   const roundDef = ROUNDS.find(r => r.num === round)
 
-  const PTS_STYLE: Record<number, string> = {
-    3: 'text-emerald-400',
-    1: 'text-sky-400',
-    0: 'text-ink-faint',
+  const ptsBadge = (pts: number, joker: boolean) => {
+    const base = pts === 3
+      ? 'bg-emerald-400/15 text-emerald-400'
+      : pts === 1
+      ? 'bg-sky-400/15 text-sky-400'
+      : 'bg-white/[0.05] text-ink-faint'
+    const label = pts > 0 ? `+${joker ? pts / 2 : pts}${joker ? '🃏' : ''}` : '0'
+    return (
+      <span className={`text-xs font-bold px-2 py-0.5 rounded-lg shrink-0 tabular-nums ${base}`}>
+        {label}
+      </span>
+    )
   }
 
   return (
@@ -93,37 +102,38 @@ export default function SummaryPage() {
       ) : rows.length === 0 ? (
         <EmptyState message={`No picks for ${roundDef?.label ?? `Round ${round}`}`} />
       ) : (
-        <div className="glass-card overflow-hidden">
-          <table className="data-table text-xs">
-            <thead>
-              <tr>
-                <th className="w-8 pl-4">#</th>
-                <th>Name</th>
-                <th>Team</th>
-                <th className="text-center">Pred.</th>
-                <th className="text-center">Actual</th>
-                <th className="text-right pr-4">Pts</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row, i) => (
-                <tr key={row.name} className={i < 3 && row.pts > 0 ? 'bg-gold-dim/20' : ''}>
-                  <td className="pl-4 text-ink-faint">{i + 1}</td>
-                  <td className="font-medium">{row.name}</td>
-                  <td className="text-ink-muted"><TeamLabel team={row.team} flagSize={16} /></td>
-                  <td className="text-center text-ink-muted">{row.predicted}</td>
-                  <td className="text-center font-semibold">
-                    {row.actual === 'TBC'
-                      ? <span className="text-ink-faint font-normal">TBC</span>
-                      : row.actual}
-                  </td>
-                  <td className={`text-right pr-4 font-display font-bold ${PTS_STYLE[row.pts] ?? 'text-ink-faint'}`}>
-                    {row.pts > 0 ? `+${row.pts}` : '0'}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="glass-card divide-y divide-white/[0.04] overflow-hidden">
+          {rows.map((row, i) => (
+            <div
+              key={row.name}
+              className={`flex items-center gap-2 sm:gap-3 px-4 py-3 ${i < 3 && row.pts > 0 ? 'bg-gold-dim/15' : ''}`}
+            >
+              {/* Rank */}
+              <span className="text-xs text-ink-faint w-4 shrink-0 text-right tabular-nums">{i + 1}</span>
+
+              {/* Name */}
+              <span className="font-semibold text-sm flex-1 min-w-0 truncate">{row.name}</span>
+
+              {/* Team flag + name */}
+              <span className="inline-flex items-center gap-1.5 shrink-0 max-w-[90px] sm:max-w-[120px]">
+                <TeamFlag team={row.team} size={16} className="shrink-0" />
+                <span className="text-xs text-ink-muted truncate hidden xs:inline sm:inline">{row.team}</span>
+              </span>
+
+              {/* Predicted | Actual */}
+              <span className="text-xs text-ink-muted shrink-0 tabular-nums whitespace-nowrap">
+                <span className="text-ink">{row.predicted}</span>
+                <span className="text-ink-faint mx-1">|</span>
+                {row.actual === 'TBC'
+                  ? <span className="text-ink-faint">TBC</span>
+                  : <span className="font-semibold text-ink">{row.actual}</span>
+                }
+              </span>
+
+              {/* Points badge */}
+              {ptsBadge(row.pts, row.joker)}
+            </div>
+          ))}
         </div>
       )}
     </div>

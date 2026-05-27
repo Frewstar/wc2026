@@ -178,9 +178,9 @@ export default function LeaderboardPage() {
             <thead>
               <tr>
                 <th className="w-12 pl-4 sticky left-0 bg-surface-raised">#</th>
-                <th className="sticky left-10 bg-surface-raised min-w-[110px]">Name</th>
+                <th className="sticky left-12 bg-surface-raised min-w-[130px]">Name</th>
                 {ROUNDS.map(r => (
-                  <th key={r.num} className="text-center px-1">{r.short}</th>
+                  <th key={r.num} className="text-center px-1 whitespace-nowrap">{r.short}</th>
                 ))}
                 <th className="text-right pr-5">Pts</th>
               </tr>
@@ -217,27 +217,15 @@ export default function LeaderboardPage() {
                       </div>
                     </td>
 
-                    {/* Name + meta */}
-                    <td className="font-medium sticky left-10 bg-inherit">
-                      <Link href={`/picks?name=${encodeURIComponent(e.name)}`} className="hover:text-pitch-light transition-colors">
+                    {/* Name */}
+                    <td className="font-medium sticky left-12 bg-inherit max-w-[130px]">
+                      <Link href={`/picks?name=${encodeURIComponent(e.name)}`} className="hover:text-pitch-light transition-colors truncate block">
                         {e.name}
                       </Link>
-                      {idx > 0 && total < leaderTotal && (
-                        <div className="text-[10px] text-ink-faint font-normal leading-tight">
-                          -{leaderTotal - total} pts
-                        </div>
-                      )}
-                      {/* Joker indicator — only visible once knockout stage begins */}
+                      {/* Joker — shown only once knockout stage is active */}
                       {e.joker_round != null && (settings?.current_round ?? 0) >= 4 && (
                         <div className="text-[10px] text-amber-400/70 font-normal leading-tight">
                           🃏 R{e.joker_round}
-                        </div>
-                      )}
-                      {/* Golden goal — shown after R1 revealed */}
-                      {showGoldenGoal && e.golden_goal != null && (
-                        <div className="text-[10px] text-ink-faint font-normal leading-tight">
-                          ⚽ {e.golden_goal}
-                          {actualGoals != null && ` (±${Math.abs(e.golden_goal - actualGoals)})`}
                         </div>
                       )}
                       {/* Tiebreaker detail for tied players */}
