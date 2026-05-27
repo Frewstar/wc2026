@@ -9,9 +9,9 @@ import {
   type Result,
   type Settings,
 } from '@/lib/scoring'
-import { ROUNDS, GROUP_ROUNDS, KNOCKOUT_ROUNDS, pickField, getTeamsInRound, type RoundDef } from '@/lib/rounds'
-import { TEAMS } from '@/lib/scoring'
+import { ROUNDS, GROUP_ROUNDS, KNOCKOUT_ROUNDS, pickField, type RoundDef } from '@/lib/rounds'
 import { parseDeadlines, isRoundLocked, formatCountdown, msUntilDeadline } from '@/lib/round-deadlines'
+import { getTeamGroup } from '@/lib/wc-groups'
 import { PageHeader, LoadingState } from '@/components/ui'
 import { IconLock, IconTrophy } from '@/components/icons'
 import { TeamFlag, TeamMatchup } from '@/components/TeamFlag'
@@ -61,6 +61,96 @@ function useCountdown(targetMs: number): string {
   return label
 }
 
+// ─── Fixture card ─────────────────────────────────────────────────────────────
+
+function FixtureCard({
+  fixture,
+  selected,
+  usedTeams,
+  onSelect,
+}: {
+  fixture: Fixture
+  selected: string
+  usedTeams: Set<string>
+  onSelect: (team: string) => void
+}) {
+  const { home_team, away_team } = fixture
+
+  function TeamBtn({ team }: { team: string }) {
+    const isTBD = !team || team === 'TBD'
+    const isSelected = selected === team
+    const isUsed = !isTBD && usedTeams.has(team)
+
+    if (isTBD) {
+      return (
+        <div className="flex-1 flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl border border-theme/30 bg-surface/30 opacity-40 select-none">
+          <div className="w-6 h-6 rounded-full bg-surface-raised border border-theme flex items-center justify-center text-[10px] text-ink-faint">?</div>
+          <span className="text-[11px] text-ink-faint">TBD</span>
+        </div>
+      )
+    }
+
+    return (
+      <button
+        type="button"
+        onClick={() => !isUsed && onSelect(isSelected ? '' : team)}
+        disabled={isUsed}
+        className={`flex-1 flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl border transition-all ${
+          isSelected
+            ? 'bg-pitch-gradient border-pitch text-white shadow-glow'
+            : isUsed
+              ? 'bg-surface/30 border-theme/20 opacity-35 cursor-not-allowed'
+              : 'bg-surface border-theme text-ink hover:bg-surface-hover hover:border-pitch/40 active:scale-[0.97]'
+        }`}
+      >
+        <TeamFlag team={team} size={26} />
+        <span className={`text-[11px] font-medium text-center leading-tight ${isSelected ? 'text-white' : isUsed ? 'text-ink-faint' : 'text-ink'}`}>
+          {team}
+        </span>
+        {isUsed && (
+          <span className="text-[9px] text-ink-faint leading-none">used</span>
+        )}
+      </button>
+    )
+  }
+
+  return (
+    <div className="flex items-stretch gap-2">
+      <TeamBtn team={home_team} />
+      <div className="flex items-center justify-center shrink-0">
+        <span className="text-[10px] font-semibold text-ink-faint">vs</span>
+      </div>
+      <TeamBtn team={away_team} />
+    </div>
+  )
+}
+
+// ─── Goals stepper ────────────────────────────────────────────────────────────
+
+function GoalStepper({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+  return (
+    <div className="flex flex-col items-center gap-1">
+      <button
+        type="button"
+        onClick={() => onChange(Math.min(20, value + 1))}
+        className="w-9 h-9 rounded-xl bg-surface border border-theme text-ink-muted hover:bg-surface-hover hover:text-ink active:scale-95 transition-all font-bold text-lg flex items-center justify-center"
+      >
+        +
+      </button>
+      <span className="font-display font-bold text-3xl text-ink w-9 text-center tabular-nums leading-none py-1">
+        {value}
+      </span>
+      <button
+        type="button"
+        onClick={() => onChange(Math.max(0, value - 1))}
+        className="w-9 h-9 rounded-xl bg-surface border border-theme text-ink-muted hover:bg-surface-hover hover:text-ink active:scale-95 transition-all font-bold text-lg flex items-center justify-center"
+      >
+        −
+      </button>
+    </div>
+  )
+}
+
 // ─── Pick form component ──────────────────────────────────────────────────────
 
 function PickForm({
@@ -93,16 +183,6 @@ function PickForm({
       .filter(Boolean) as string[]
   )
 
-  // Available teams
-  let availableTeams: string[]
-  if (isKnockoutRound) {
-    availableTeams = getTeamsInRound(fixtures, round.num).filter(t => !usedTeams.has(t))
-  } else {
-    // Group rounds: all 48 TEAMS with fixtures in this round, minus already picked
-    const inRound = new Set(getTeamsInRound(fixtures, round.num))
-    availableTeams = (inRound.size > 0 ? [...inRound] : TEAMS).filter(t => !usedTeams.has(t))
-  }
-
   // Pre-fill if editing
   const existingTeam = (entry?.[pickField(round.num, 'team') as keyof Entry] as string | null) ?? ''
   const existingMyGoals = (entry?.[pickField(round.num, 'my_goals') as keyof Entry] as number) ?? 1
@@ -117,6 +197,32 @@ function PickForm({
   const isEditing = Boolean(existingTeam)
   const showGoldenGoal = isR1 && entry?.golden_goal == null
   const countdown = useCountdown(Date.now() + deadlineMs)
+
+  // Fixtures for this round
+  const roundFixtures = fixtures.filter(fx => fx.round === round.num)
+
+  // Find the opponent for the selected team
+  const selectedFixture = team
+    ? roundFixtures.find(fx => fx.home_team === team || fx.away_team === team)
+    : null
+  const opponent = selectedFixture
+    ? (selectedFixture.home_team === team ? selectedFixture.away_team : selectedFixture.home_team)
+    : null
+
+  // Group fixtures by WC group (A–L) for group rounds
+  type GroupedFixtures = { group: string; fixtures: Fixture[] }
+  const groupedFixtures: GroupedFixtures[] = []
+  if (isGroupRound && roundFixtures.length > 0) {
+    const map = new Map<string, Fixture[]>()
+    for (const fx of roundFixtures) {
+      const grp = getTeamGroup(fx.home_team) ?? getTeamGroup(fx.away_team) ?? '?'
+      if (!map.has(grp)) map.set(grp, [])
+      map.get(grp)!.push(fx)
+    }
+    for (const grp of [...map.keys()].sort()) {
+      groupedFixtures.push({ group: grp, fixtures: map.get(grp)! })
+    }
+  }
 
   const handleSubmit = async () => {
     if (!team) { setError('Please select a team'); return }
@@ -146,7 +252,7 @@ function PickForm({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {/* Deadline banner */}
       {deadlineMs < Infinity && deadlineMs > 0 && (
         <div className="flex items-center gap-2 bg-amber-500/10 border border-amber-500/30 rounded-xl px-4 py-2.5 text-xs text-amber-300">
@@ -155,58 +261,82 @@ function PickForm({
         </div>
       )}
 
-      {/* Team selector */}
+      {/* Fixture picker */}
       <div>
-        <label className="section-label mb-2 block">Pick your team</label>
-        {availableTeams.length === 0 ? (
-          <p className="text-sm text-amber-400">No teams available — fixtures not yet set for this round.</p>
+        <label className="section-label mb-3 block">Pick your team</label>
+
+        {roundFixtures.length === 0 ? (
+          <p className="text-sm text-amber-400">Fixtures not yet set for this round — check back soon.</p>
+        ) : isGroupRound ? (
+          /* Group rounds: fixtures grouped A → L */
+          <div className="space-y-5">
+            {groupedFixtures.map(({ group, fixtures: gfx }) => (
+              <div key={group}>
+                <p className="text-[10px] font-semibold text-ink-faint uppercase tracking-widest mb-2 flex items-center gap-2">
+                  <span className="inline-flex items-center justify-center w-5 h-5 rounded-md bg-pitch-muted text-pitch-light text-[10px] font-bold">{group}</span>
+                  Group {group}
+                </p>
+                <div className="space-y-2">
+                  {gfx.map((fx, i) => (
+                    <FixtureCard
+                      key={i}
+                      fixture={fx}
+                      selected={team}
+                      usedTeams={usedTeams}
+                      onSelect={setTeam}
+                    />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
         ) : (
-          <div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto pr-1">
-            {availableTeams.sort().map(t => (
-              <button
-                key={t}
-                onClick={() => setTeam(t)}
-                className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium border transition-all text-left ${
-                  team === t
-                    ? 'bg-pitch-gradient text-white border-pitch shadow-glow'
-                    : 'bg-surface border-theme text-ink-muted hover:bg-surface-hover hover:text-ink'
-                }`}
-              >
-                <TeamFlag team={t} size={16} />
-                <span className="truncate">{t}</span>
-              </button>
+          /* Knockout rounds: plain fixture list */
+          <div className="space-y-2">
+            {roundFixtures.map((fx, i) => (
+              <FixtureCard
+                key={i}
+                fixture={fx}
+                selected={team}
+                usedTeams={usedTeams}
+                onSelect={setTeam}
+              />
             ))}
           </div>
         )}
       </div>
 
-      {/* Score prediction */}
+      {/* Score prediction — appears once a team is selected */}
       {team && (
-        <div>
-          <label className="section-label mb-2 block">Predicted score (your team first)</label>
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1.5">
-              <TeamFlag team={team} size={18} />
-              <span className="text-xs text-ink-muted w-16 truncate">{team}</span>
+        <div className="rounded-2xl border border-pitch/30 bg-surface p-4">
+          <p className="section-label mb-4 text-center block">Predicted score</p>
+          <div className="flex items-center justify-center gap-4">
+            {/* My team */}
+            <div className="flex flex-col items-center gap-1 min-w-[60px]">
+              <TeamFlag team={team} size={32} />
+              <span className="text-[11px] font-medium text-ink text-center leading-tight max-w-[64px]">{team}</span>
             </div>
-            <input
-              type="number"
-              min={0}
-              max={20}
-              value={myGoals}
-              onChange={e => setMyGoals(Math.max(0, parseInt(e.target.value) || 0))}
-              className="w-14 input-field-sm text-center text-lg font-bold"
-            />
-            <span className="text-ink-faint font-bold">–</span>
-            <input
-              type="number"
-              min={0}
-              max={20}
-              value={oppGoals}
-              onChange={e => setOppGoals(Math.max(0, parseInt(e.target.value) || 0))}
-              className="w-14 input-field-sm text-center text-lg font-bold"
-            />
-            <span className="text-xs text-ink-faint flex-1">opponent</span>
+
+            <GoalStepper value={myGoals} onChange={setMyGoals} />
+
+            <span className="text-ink-faint font-bold text-xl">–</span>
+
+            <GoalStepper value={oppGoals} onChange={setOppGoals} />
+
+            {/* Opponent */}
+            <div className="flex flex-col items-center gap-1 min-w-[60px]">
+              {opponent && opponent !== 'TBD' ? (
+                <>
+                  <TeamFlag team={opponent} size={32} />
+                  <span className="text-[11px] font-medium text-ink-muted text-center leading-tight max-w-[64px]">{opponent}</span>
+                </>
+              ) : (
+                <>
+                  <div className="w-8 h-8 rounded-full bg-surface-raised border border-theme flex items-center justify-center text-xs text-ink-faint">?</div>
+                  <span className="text-[11px] text-ink-faint">TBD</span>
+                </>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -217,9 +347,9 @@ function PickForm({
           <label className="section-label mb-1 block">⚽ Golden Goal — tiebreaker</label>
           <p className="text-xs text-ink-muted mb-3 leading-relaxed">
             How many total goals will be scored in the entire tournament?
-            The 2022 World Cup had <strong className="text-ink">172 goals</strong> across 64 matches.
+            2022 had <strong className="text-ink">172 goals</strong> across 64 matches.
             2026 has 104 matches — expect more.
-            <br /><span className="text-ink-faint">This is your tiebreaker if you finish level on points. Locked in once Round 1 is submitted.</span>
+            <br /><span className="text-ink-faint">Locked in once Round 1 is submitted.</span>
           </p>
           <div className="flex items-center gap-3">
             <input
