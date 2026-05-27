@@ -66,7 +66,7 @@ function buildEmailHtml(name: string, link: string): string {
                     </p>
                     <p style="margin:0;color:#94a3b8;font-size:13px;line-height:1.5;">
                       <strong style="color:#e2e8f0;">Round 1 kicks off 11 June.</strong>
-                      We'll send you a reminder when it's time to make your picks.
+                      The app shows a live countdown — check back when a round is open to make your pick.
                     </p>
                   </td>
                 </tr>
