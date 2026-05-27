@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { PageHeader } from '@/components/ui'
 import { IconExternalLink } from '@/components/icons'
 import { TeamFlag } from '@/components/TeamFlag'
+import { MAX_POINTS } from '@/lib/rules'
 
 type JoinSettings = {
   whatsapp_group_url?: string | null
@@ -59,7 +60,7 @@ export default function JoinPage() {
               <p className="text-[10px] text-ink-muted mt-0.5 uppercase tracking-wide">Rounds</p>
             </div>
             <div className="rounded-xl bg-pitch-muted/40 py-3 px-1">
-              <p className="font-display font-bold text-pitch-light text-lg">24</p>
+              <p className="font-display font-bold text-pitch-light text-lg">{MAX_POINTS}</p>
               <p className="text-[10px] text-ink-muted mt-0.5 uppercase tracking-wide">Max pts</p>
             </div>
             <div className="rounded-xl bg-pitch-muted/40 py-3 px-1">
