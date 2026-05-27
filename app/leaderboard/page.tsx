@@ -227,8 +227,8 @@ export default function LeaderboardPage() {
                           -{leaderTotal - total} pts
                         </div>
                       )}
-                      {/* Joker indicator */}
-                      {e.joker_round != null && (
+                      {/* Joker indicator — only visible once knockout stage begins */}
+                      {e.joker_round != null && (settings?.current_round ?? 0) >= 4 && (
                         <div className="text-[10px] text-amber-400/70 font-normal leading-tight">
                           🃏 R{e.joker_round}
                         </div>

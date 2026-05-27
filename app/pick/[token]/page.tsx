@@ -478,16 +478,19 @@ export default function PickPage() {
             <p className="text-xs text-ink-muted mt-1">points</p>
           </div>
           <div className="text-right space-y-2">
-            <div className={`text-xs px-3 py-1.5 rounded-full border font-medium ${
-              jokerUsed
-                ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
-                : 'bg-white/5 text-ink-muted border-theme'
-            }`}>
-              {jokerUsed
-                ? `🃏 Joker used — R${jokerRound}`
-                : '🃏 Joker available'
-              }
-            </div>
+            {/* Only show joker status during knockout stage or once joker has been played */}
+            {((currentRound ?? 0) >= 4 || jokerUsed) && (
+              <div className={`text-xs px-3 py-1.5 rounded-full border font-medium ${
+                jokerUsed
+                  ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+                  : 'bg-white/5 text-ink-muted border-theme'
+              }`}>
+                {jokerUsed
+                  ? `🃏 Joker played — ${ROUNDS.find(r => r.num === jokerRound)?.label ?? `Round ${jokerRound}`}`
+                  : '🃏 Joker available'
+                }
+              </div>
+            )}
             {(entry?.golden_goal != null || (currentRound === 1 && !hasPickedCurrentRound)) && (
               <div className="text-xs text-ink-faint">
                 {entry?.golden_goal != null
