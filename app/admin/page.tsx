@@ -961,52 +961,86 @@ export default function AdminPage() {
           />
           {resFixtures.length === 0 ? (
             <p className="text-ink-muted text-sm text-center py-8">Add fixtures first</p>
-          ) : resFixtures.map(f => {
-            const existing = results.find(r => r.round === f.round && r.home_team === f.home_team)
-            const hKey = `${f.round}-${f.home_team}-h`
-            const aKey = `${f.round}-${f.home_team}-a`
-            const wKey = `${f.round}-${f.home_team}-w`
-            const isKnockout = f.round >= 4
-            return (
-              <div key={f.id} className="glass-card p-4">
-                <p className="font-semibold text-sm mb-3">{f.home_team} vs {f.away_team}</p>
-                <div className="flex items-center gap-3 flex-wrap">
-                  <input type="number" min="0" max="20"
-                    defaultValue={existing?.home_goals ?? 0}
-                    onChange={e => setResEdits(p => ({ ...p, [hKey]: parseInt(e.target.value) || 0 }))}
-                    className="w-16 input-field-sm text-center text-lg font-bold"
-                  />
-                  <span className="text-ink-faint text-lg">–</span>
-                  <input type="number" min="0" max="20"
-                    defaultValue={existing?.away_goals ?? 0}
-                    onChange={e => setResEdits(p => ({ ...p, [aKey]: parseInt(e.target.value) || 0 }))}
-                    className="w-16 input-field-sm text-center text-lg font-bold"
-                  />
-                  {isKnockout && (
-                    <select
-                      defaultValue={existing?.winner_team ?? ''}
-                      onChange={e => setWinnerEdits(p => ({ ...p, [wKey]: e.target.value }))}
-                      className="input-field-sm text-xs flex-1 min-w-[120px]"
-                    >
-                      <option value="">Winner (if pens)</option>
-                      <option value={f.home_team}>{f.home_team}</option>
-                      <option value={f.away_team}>{f.away_team}</option>
-                    </select>
+          ) : (() => {
+            const renderFixture = (f: Fixture) => {
+              const existing = results.find(r => r.round === f.round && r.home_team === f.home_team)
+              const hKey = `${f.round}-${f.home_team}-h`
+              const aKey = `${f.round}-${f.home_team}-a`
+              const wKey = `${f.round}-${f.home_team}-w`
+              const isKnockout = f.round >= 4
+              return (
+                <div key={f.id} className="glass-card p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="font-semibold text-sm">{f.home_team} vs {f.away_team}</p>
+                    {f.kickoff && (
+                      <p className="text-[10px] text-ink-faint shrink-0 ml-2">{formatUKKickoff(f.kickoff)}</p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <input type="number" min="0" max="20"
+                      defaultValue={existing?.home_goals ?? 0}
+                      onChange={e => setResEdits(p => ({ ...p, [hKey]: parseInt(e.target.value) || 0 }))}
+                      className="w-16 input-field-sm text-center text-lg font-bold"
+                    />
+                    <span className="text-ink-faint text-lg">–</span>
+                    <input type="number" min="0" max="20"
+                      defaultValue={existing?.away_goals ?? 0}
+                      onChange={e => setResEdits(p => ({ ...p, [aKey]: parseInt(e.target.value) || 0 }))}
+                      className="w-16 input-field-sm text-center text-lg font-bold"
+                    />
+                    {isKnockout && (
+                      <select
+                        defaultValue={existing?.winner_team ?? ''}
+                        onChange={e => setWinnerEdits(p => ({ ...p, [wKey]: e.target.value }))}
+                        className="input-field-sm text-xs flex-1 min-w-[120px]"
+                      >
+                        <option value="">Winner (if pens)</option>
+                        <option value={f.home_team}>{f.home_team}</option>
+                        <option value={f.away_team}>{f.away_team}</option>
+                      </select>
+                    )}
+                    <button onClick={() => saveResult(f)}
+                      className="ml-auto bg-pitch-gradient text-white rounded-xl px-4 py-2 text-sm font-semibold hover:brightness-110 transition">
+                      Save
+                    </button>
+                  </div>
+                  {existing && (
+                    <p className="text-xs text-emerald-400 mt-2">
+                      Saved: {existing.home_goals}–{existing.away_goals}
+                      {existing.winner_team ? ` · Winner: ${existing.winner_team}` : ''}
+                    </p>
                   )}
-                  <button onClick={() => saveResult(f)}
-                    className="ml-auto bg-pitch-gradient text-white rounded-xl px-4 py-2 text-sm font-semibold hover:brightness-110 transition">
-                    Save
-                  </button>
                 </div>
-                {existing && (
-                  <p className="text-xs text-emerald-400 mt-2">
-                    Saved: {existing.home_goals}–{existing.away_goals}
-                    {existing.winner_team ? ` · Winner: ${existing.winner_team}` : ''}
-                  </p>
-                )}
+              )
+            }
+
+            // Knockout rounds — flat list
+            if (resRound >= 4) {
+              return <div className="space-y-3">{resFixtures.map(renderFixture)}</div>
+            }
+
+            // Group stage — group by WC group letter
+            const groupMap = new Map<string, Fixture[]>()
+            for (const f of resFixtures) {
+              const grp = getTeamGroup(f.home_team) || getTeamGroup(f.away_team) || '?'
+              if (!groupMap.has(grp)) groupMap.set(grp, [])
+              groupMap.get(grp)!.push(f)
+            }
+            const sortedGroups = [...groupMap.entries()].sort(([a], [b]) => a.localeCompare(b))
+
+            return (
+              <div className="space-y-5">
+                {sortedGroups.map(([grp, gFixtures]) => (
+                  <div key={grp} className="space-y-2">
+                    <p className="text-[11px] font-bold text-ink-faint uppercase tracking-widest px-1">
+                      Group {grp}
+                    </p>
+                    {gFixtures.map(renderFixture)}
+                  </div>
+                ))}
               </div>
             )
-          })}
+          })()}
         </div>
       )}
 
