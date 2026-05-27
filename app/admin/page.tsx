@@ -485,31 +485,67 @@ export default function AdminPage() {
         const prevRound = ROUNDS.find(r => r.num === (cur ?? 0) - 1)
         const nextRound = ROUNDS.find(r => r.num === (cur ?? 0) + 1)
         const firstRound = ROUNDS[0]
+        const deadlines = parseDeadlines(settings.round_deadlines)
+        const curDeadline = cur ? (deadlines[String(cur)] ?? '') : ''
+        const isLocked = curDeadline ? new Date(curDeadline).getTime() <= Date.now() : false
+
+        const saveDeadline = (iso: string) => {
+          const updated = { ...deadlines }
+          if (iso) updated[String(cur)] = iso
+          else delete updated[String(cur)]
+          updateSettings({ round_deadlines: JSON.stringify(updated) })
+        }
+
         return (
-          <div className="flex items-center gap-2 px-1 py-2 rounded-2xl bg-surface border border-theme">
-            <button
-              disabled={!prevRound && !!cur}
-              onClick={() => updateSettings({ current_round: prevRound ? prevRound.num : null })}
-              className="px-3 py-1.5 rounded-xl text-xs font-semibold text-ink-muted hover:text-ink hover:bg-pitch-muted/40 disabled:opacity-30 transition-colors shrink-0"
-              title={prevRound ? `Open ${prevRound.label}` : 'Close round'}
-            >
-              ←
-            </button>
-            <div className="flex-1 text-center">
-              {curRound ? (
-                <span className="text-xs font-semibold text-pitch-light">{curRound.label} open</span>
-              ) : (
-                <span className="text-xs text-ink-faint">No round open</span>
-              )}
+          <div className="rounded-2xl bg-surface border border-theme overflow-hidden">
+            {/* Row 1: prev / round name / next */}
+            <div className="flex items-center gap-2 px-1 py-2">
+              <button
+                disabled={!prevRound && !!cur}
+                onClick={() => updateSettings({ current_round: prevRound ? prevRound.num : null })}
+                className="px-3 py-1.5 rounded-xl text-xs font-semibold text-ink-muted hover:text-ink hover:bg-pitch-muted/40 disabled:opacity-30 transition-colors shrink-0"
+              >
+                ←
+              </button>
+              <div className="flex-1 text-center">
+                {curRound ? (
+                  <span className={`text-xs font-semibold ${isLocked ? 'text-red-400' : 'text-pitch-light'}`}>
+                    {curRound.label} {isLocked ? '· locked' : '· open'}
+                  </span>
+                ) : (
+                  <span className="text-xs text-ink-faint">No round open</span>
+                )}
+              </div>
+              <button
+                disabled={!nextRound && !cur}
+                onClick={() => updateSettings({ current_round: nextRound ? nextRound.num : firstRound.num })}
+                className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-pitch-muted/40 text-pitch-light hover:bg-pitch-muted/60 disabled:opacity-30 transition-colors shrink-0"
+              >
+                {nextRound ? `→ ${nextRound.short}` : '→'}
+              </button>
             </div>
-            <button
-              disabled={!nextRound && !cur}
-              onClick={() => updateSettings({ current_round: nextRound ? nextRound.num : firstRound.num })}
-              className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-pitch-muted/40 text-pitch-light hover:bg-pitch-muted/60 disabled:opacity-30 transition-colors shrink-0"
-              title={nextRound ? `Open ${nextRound.label}` : undefined}
-            >
-              {nextRound ? `→ ${nextRound.short}` : '→'}
-            </button>
+            {/* Row 2: deadline for current round */}
+            {cur && (
+              <div className="flex items-center gap-2 px-3 py-2 border-t border-theme bg-pitch-muted/10">
+                <span className="text-[11px] text-ink-faint shrink-0">Closes</span>
+                <input
+                  type="datetime-local"
+                  defaultValue={toUKInputValue(curDeadline)}
+                  key={cur}
+                  onBlur={e => saveDeadline(e.target.value ? fromUKInputValue(e.target.value) : '')}
+                  className="input-field-sm flex-1 text-xs"
+                />
+                {curDeadline && (
+                  <button
+                    onClick={() => saveDeadline('')}
+                    className="text-[11px] text-ink-faint hover:text-red-400 shrink-0 transition-colors"
+                    title="Clear deadline"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         )
       })()}
