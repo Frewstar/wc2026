@@ -478,6 +478,42 @@ export default function AdminPage() {
         ))}
       </div>
 
+      {/* ── Round control bar ─────────────────────────────────────────────── */}
+      {settings && (() => {
+        const cur = settings.current_round
+        const curRound = ROUNDS.find(r => r.num === cur)
+        const prevRound = ROUNDS.find(r => r.num === (cur ?? 0) - 1)
+        const nextRound = ROUNDS.find(r => r.num === (cur ?? 0) + 1)
+        const firstRound = ROUNDS[0]
+        return (
+          <div className="flex items-center gap-2 px-1 py-2 rounded-2xl bg-surface border border-theme">
+            <button
+              disabled={!prevRound && !!cur}
+              onClick={() => updateSettings({ current_round: prevRound ? prevRound.num : null })}
+              className="px-3 py-1.5 rounded-xl text-xs font-semibold text-ink-muted hover:text-ink hover:bg-pitch-muted/40 disabled:opacity-30 transition-colors shrink-0"
+              title={prevRound ? `Open ${prevRound.label}` : 'Close round'}
+            >
+              ←
+            </button>
+            <div className="flex-1 text-center">
+              {curRound ? (
+                <span className="text-xs font-semibold text-pitch-light">{curRound.label} open</span>
+              ) : (
+                <span className="text-xs text-ink-faint">No round open</span>
+              )}
+            </div>
+            <button
+              disabled={!nextRound && !cur}
+              onClick={() => updateSettings({ current_round: nextRound ? nextRound.num : firstRound.num })}
+              className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-pitch-muted/40 text-pitch-light hover:bg-pitch-muted/60 disabled:opacity-30 transition-colors shrink-0"
+              title={nextRound ? `Open ${nextRound.label}` : undefined}
+            >
+              {nextRound ? `→ ${nextRound.short}` : '→'}
+            </button>
+          </div>
+        )
+      })()}
+
       {tab === 'access' && (() => {
         const paid = entries.filter(e => e.paid)
         const unpaid = entries.filter(e => !e.paid)
