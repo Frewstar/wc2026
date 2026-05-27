@@ -33,45 +33,46 @@ export const GAME_RULES = [
   {
     step: '01',
     title: 'Group stage',
-    body: 'Pick one team for each of Round 1, Round 2, and Round 3 of the group stage.',
+    body: 'Pick one team for each of Round 1, Round 2, and Round 3 of the group stage. You cannot pick the same team twice within the group stage.',
   },
   {
     step: '02',
     title: 'Knockout stage',
-    body: 'After the group stage, pick one team for each knockout round: Last 32, Last 16, Quarter-finals, Semi-finals, and the Final.',
+    body: 'After the group stage, pick one team for each knockout round: Last 32, Last 16, Quarter-finals, Semi-finals, and the Final. You cannot repeat a team you have already picked in the knockout stage.',
   },
   {
     step: '03',
-    title: 'No repeats',
-    body: 'You cannot pick the same team twice across all eight rounds.',
+    title: 'Predict the score',
+    body: 'For every round, predict the full-time score for your picked team\'s match. Your team must be named first.',
   },
   {
     step: '04',
-    title: 'Predict the score',
-    body: 'For every round, predict the full-time score for your picked team\'s match.',
+    title: 'Everyone stays in',
+    body: 'No one is knocked out of the competition — everyone picks every round and points keep accumulating all the way to the Final.',
   },
   {
     step: '05',
-    title: 'Everyone stays in',
-    body: 'No one is knocked out of the competition — all players vote every round and points keep adding up.',
+    title: 'Joker 🃏',
+    body: 'Each player gets one Joker to use in the knockout stage (Round 4–8). When your Joker is played, your points for that round are doubled — 1 pt becomes 2, 3 pts becomes 6. The Joker is assigned by the admin before the round kicks off. You\'ll receive an email when yours is activated.',
   },
   {
     step: '06',
-    title: 'Running total',
-    body: 'Points from all eight rounds accumulate on the leaderboard through to the Final.',
-  },
-  {
-    step: '07',
-    title: 'Golden Goal',
-    body: 'When entering your group stage picks, predict the total number of goals scored across the entire tournament. This is your final tiebreaker.',
+    title: 'Golden Goal ⚽',
+    body: 'Before Round 1 kicks off, predict the total number of goals scored across the entire tournament. This prediction is used as the tiebreaker if two or more players finish level on points — whoever is closest wins.',
   },
 ]
 
 export const TIEBREAKER_RULES = [
-  { rank: 1, label: 'Most exact scores', detail: 'Count of 3-point picks (correct team and correct score)' },
-  { rank: 2, label: 'Most correct wins', detail: 'Count of 1-point picks (correct team, wrong score)' },
-  { rank: 3, label: 'Golden Goal', detail: 'Closest prediction of total tournament goals wins. Entered at the start of the competition.' },
-  { rank: 4, label: 'Earliest entry', detail: 'If everything else is equal, the player who submitted picks first wins.' },
+  {
+    rank: 1,
+    label: 'Golden Goal ⚽',
+    detail: 'Whoever\'s total goals prediction is closest to the actual tournament total wins the tie. Submitted before Round 1 and locked in — cannot be changed.',
+  },
+  {
+    rank: 2,
+    label: 'Earliest entry',
+    detail: 'If Golden Goal predictions are identical, the player who submitted their Round 1 pick first wins.',
+  },
 ]
 
-export const MAX_POINTS = 24
+export const MAX_POINTS = 27 // 7 rounds × 3pts + 1 Joker round × 6pts
