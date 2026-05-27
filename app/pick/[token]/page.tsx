@@ -107,28 +107,19 @@ function PickForm({
   const existingTeam = (entry?.[pickField(round.num, 'team') as keyof Entry] as string | null) ?? ''
   const existingMyGoals = (entry?.[pickField(round.num, 'my_goals') as keyof Entry] as number) ?? 1
   const existingOppGoals = (entry?.[pickField(round.num, 'opp_goals') as keyof Entry] as number) ?? 0
-  const existingJoker = entry?.joker_round === round.num
-
   const [team, setTeam] = useState(existingTeam)
   const [myGoals, setMyGoals] = useState(existingMyGoals)
   const [oppGoals, setOppGoals] = useState(existingOppGoals)
-  const [joker, setJoker] = useState(existingJoker)
-  const [jokerConfirm, setJokerConfirm] = useState(false)
   const [goldenGoal, setGoldenGoal] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
   const isEditing = Boolean(existingTeam)
-  const canPlayJoker = !entry?.joker_used || entry.joker_round === round.num
   const showGoldenGoal = isR1 && entry?.golden_goal == null
   const countdown = useCountdown(Date.now() + deadlineMs)
 
   const handleSubmit = async () => {
     if (!team) { setError('Please select a team'); return }
-    if (joker && !jokerConfirm && !isEditing) {
-      setError('Please confirm your joker below')
-      return
-    }
     setSubmitting(true)
     setError('')
     try {
@@ -141,7 +132,6 @@ function PickForm({
           team,
           my_goals: myGoals,
           opp_goals: oppGoals,
-          joker,
           ...(showGoldenGoal && goldenGoal !== '' ? { golden_goal: parseInt(goldenGoal) || 0 } : {}),
         }),
       })
@@ -246,49 +236,16 @@ function PickForm({
         </div>
       )}
 
-      {/* Joker toggle — knockout rounds only (R4-R8) */}
-      {isKnockoutRound && canPlayJoker && !entry?.joker_used && (
-        <div className="glass-card p-4 border border-amber-500/20">
-          <div className="flex items-center justify-between mb-2">
-            <div>
-              <p className="text-sm font-semibold text-ink">🃏 Play your Joker this round?</p>
-              <p className="text-xs text-ink-muted mt-0.5">Doubles your points for this round. One use only.</p>
-            </div>
-            <button
-              onClick={() => { setJoker(j => !j); setJokerConfirm(false) }}
-              className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 transition-colors ${
-                joker ? 'bg-amber-500 border-amber-500' : 'bg-white/10 border-white/20'
-              }`}
-            >
-              <span className={`inline-block h-4 w-4 mt-px rounded-full bg-white shadow transition-transform ${
-                joker ? 'translate-x-5' : 'translate-x-0.5'
-              }`} />
-            </button>
-          </div>
-          {joker && (
-            <div className="mt-3 bg-amber-500/10 border border-amber-500/30 rounded-xl p-3">
-              <p className="text-xs text-amber-300 font-semibold mb-2">
-                ⚠️ Your joker is locked in once you submit — points doubled this round.
-              </p>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={jokerConfirm}
-                  onChange={e => setJokerConfirm(e.target.checked)}
-                  className="w-4 h-4 accent-amber-500"
-                />
-                <span className="text-xs text-amber-200">Yes, I&apos;m sure — play my joker</span>
-              </label>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Already used joker elsewhere — only shown in knockout so the info is relevant */}
-      {isKnockoutRound && entry?.joker_used && entry.joker_round !== round.num && (
-        <div className="flex items-center gap-2 bg-white/5 border border-theme rounded-xl px-4 py-2.5 text-xs text-ink-faint">
+      {/* Joker status — view only, assigned by admin */}
+      {isKnockoutRound && entry?.joker_used && (
+        <div className="flex items-center gap-2 bg-amber-500/10 border border-amber-500/30 rounded-xl px-4 py-2.5 text-xs text-amber-300">
           <span>🃏</span>
-          <span>Joker already used on {ROUNDS.find(r => r.num === entry.joker_round)?.label ?? `Round ${entry.joker_round}`}</span>
+          <span>
+            {entry.joker_round === round.num
+              ? 'Joker assigned to this round — points will be doubled!'
+              : `Joker assigned to ${ROUNDS.find(r => r.num === entry.joker_round)?.label ?? `Round ${entry.joker_round}`}`
+            }
+          </span>
         </div>
       )}
 
@@ -298,17 +255,10 @@ function PickForm({
 
       <button
         onClick={handleSubmit}
-        disabled={submitting || !team || (joker && !jokerConfirm && !isEditing)}
-        className={`btn-primary flex items-center justify-center gap-2 disabled:opacity-50 ${
-          joker ? 'ring-2 ring-amber-500/50' : ''
-        }`}
+        disabled={submitting || !team}
+        className="btn-primary flex items-center justify-center gap-2 disabled:opacity-50"
       >
-        {submitting
-          ? 'Saving…'
-          : isEditing
-            ? `Update Pick${joker ? ' 🃏' : ''}`
-            : `Submit Pick${joker ? ' 🃏' : ''}`
-        }
+        {submitting ? 'Saving…' : isEditing ? 'Update Pick' : 'Submit Pick'}
       </button>
     </div>
   )

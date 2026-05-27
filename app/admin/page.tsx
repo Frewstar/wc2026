@@ -287,6 +287,18 @@ export default function AdminPage() {
     showToast('Entry deleted')
   }
 
+  const setJoker = async (entryId: string, jokerRound: number | null) => {
+    const res = await fetch('/api/admin/set-joker', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ entry_id: entryId, joker_round: jokerRound }),
+    })
+    const data = await res.json()
+    if (!res.ok) { showToast(data.error || 'Error setting joker'); return }
+    await loadAll()
+    showToast(jokerRound ? `🃏 Joker set to Round ${jokerRound}` : 'Joker removed')
+  }
+
   const downloadCSV = (csv: string, filename: string) => {
     const a = document.createElement('a')
     a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }))
@@ -694,17 +706,50 @@ export default function AdminPage() {
             <div className="glass-card divide-y divide-white/[0.04]">
               {entries.map(e => {
                 const { total } = calcPoints(e, results)
+                const jokerRoundDef = ROUNDS.find(r => r.num === e.joker_round)
                 return (
-                  <div key={e.id} className="flex items-center justify-between px-4 py-3">
-                    <div>
-                      <div className="font-semibold text-sm">{e.name}</div>
-                      <div className="text-xs text-ink-faint truncate max-w-[140px]">
-                        {ROUNDS.map(r => e[pickField(r.num, 'team') as keyof Entry] || '—').join(' · ')}
+                  <div key={e.id} className="px-4 py-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="font-semibold text-sm">{e.name}</div>
+                        <div className="text-xs text-ink-faint truncate max-w-[180px]">
+                          {ROUNDS.map(r => e[pickField(r.num, 'team') as keyof Entry] || '—').join(' · ')}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="font-display font-bold text-gold">{total}</span>
+                        <button onClick={() => deleteEntry(e.id)} className="text-red-400/70 text-xs hover:text-red-400 transition-colors">Remove</button>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <span className="font-display font-bold text-gold">{total}</span>
-                      <button onClick={() => deleteEntry(e.id)} className="text-red-400/70 text-xs hover:text-red-400 transition-colors">Remove</button>
+                    {/* Joker management — knockout rounds only */}
+                    <div className="flex items-center gap-2 pt-1.5 border-t border-white/[0.04]">
+                      <span className="text-[11px] text-ink-faint shrink-0">🃏 Joker:</span>
+                      {e.joker_used ? (
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] font-semibold text-amber-400">
+                            {jokerRoundDef ? jokerRoundDef.label : `R${e.joker_round}`}
+                          </span>
+                          <button
+                            onClick={() => setJoker(e.id, null)}
+                            className="text-[11px] text-red-400/60 hover:text-red-400 transition-colors"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      ) : (
+                        <select
+                          value=""
+                          onChange={ev => ev.target.value && setJoker(e.id, parseInt(ev.target.value))}
+                          className="input-field-sm text-[11px] py-0.5 flex-1 max-w-[200px]"
+                        >
+                          <option value="">— assign knockout round —</option>
+                          <option value="4">Last 32 (R4)</option>
+                          <option value="5">Last 16 (R5)</option>
+                          <option value="6">Quarter-final (R6)</option>
+                          <option value="7">Semi-final (R7)</option>
+                          <option value="8">Final (R8)</option>
+                        </select>
+                      )}
                     </div>
                   </div>
                 )
