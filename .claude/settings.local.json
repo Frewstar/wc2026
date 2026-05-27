@@ -1,0 +1,37 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -i \"error\\\\|warn\\\\|failed\\\\|cannot\\\\|undefined\\\\|TypeError\\\\| 500 \\\\| 404 \" /tmp/nextdev.log 2>/dev/null | head -40 || echo \"No errors found in log\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3000/)",
+      "Bash(curl -s http://localhost:3000/)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3000/leaderboard)",
+      "Bash(curl -s -o /dev/null -w \" %{http_code}\" http://localhost:3000/admin)",
+      "Bash(curl -s -o /dev/null -w \" %{http_code}\" http://localhost:3000/scores)",
+      "Bash(curl -s -o /dev/null -w \" %{http_code}\" http://localhost:3000/summary)",
+      "Bash(curl -s -o /dev/null -w \" %{http_code}\" http://localhost:3000/schedule)",
+      "Bash(npm install *)",
+      "Bash(npx tsc *)",
+      "Bash(curl -s -o /dev/null -w \" %{http_code}\" http://localhost:3000/pick/test-token-123)",
+      "Bash(next --version)",
+      "Bash(curl -s -o /dev/null -w \" %{http_code}\" http://localhost:3000/pick/test-token)",
+      "Bash(curl -s -o /dev/null -w \" %{http_code}\" http://localhost:3000/leaderboard)",
+      "Bash(curl -s -o /dev/null -w \" %{http_code}\" \"http://localhost:3000/pick/5363550e-415c-4922-b21c-d9bbfc6753b1\")",
+      "Bash(railway whoami *)",
+      "Bash(echo \"EXIT:$?\")",
+      "Bash(railway login *)",
+      "Bash(railway init *)",
+      "Bash(railway up *)",
+      "Bash(railway link *)",
+      "Bash(railway variables *)",
+      "Bash(railway service *)",
+      "Bash(railway status *)",
+      "Bash(railway domain *)",
+      "Bash(railway logs *)",
+      "Bash(npm audit *)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" https://wc2026-production-2008.up.railway.app)",
+      "Bash(git init *)",
+      "Bash(git remote *)",
+      "Bash(git add *)"
+    ]
+  }
+}
