@@ -54,6 +54,7 @@ export default function AdminPage() {
   const [demoSeeding, setDemoSeeding] = useState(false)
   const [demoPickUrl, setDemoPickUrl] = useState<string | null>(null)
   const [demoClearing, setDemoClearing] = useState(false)
+  const [roundOpenError, setRoundOpenError] = useState<number | null>(null)
   const autoSyncRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const [toast, setToast] = useState('')
   const [winnerEdits, setWinnerEdits] = useState<Record<string, string>>({})
@@ -421,6 +422,13 @@ export default function AdminPage() {
   const usedInRound = roundFixtures.flatMap(f => [f.home_team, f.away_team])
   const availableTeams = TEAMS.filter(t => !usedInRound.includes(t))
   const resFixtures = fixtures.filter(f => Number(f.round) === resRound)
+
+  // Default deadline inputs (UK local time, pre-fill if no saved deadline)
+  const ROUND_DEADLINE_DEFAULTS: Record<number, string> = {
+    1: '2026-06-11T19:00', 2: '2026-06-17T19:00', 3: '2026-06-25T19:00',
+    4: '2026-06-29T19:00', 5: '2026-07-04T19:00', 6: '2026-07-08T19:00',
+    7: '2026-07-14T19:00', 8: '2026-07-18T19:00',
+  }
 
   const TABS: { key: Tab; label: string }[] = [
     { key: 'access', label: 'Access' },
@@ -1082,6 +1090,142 @@ export default function AdminPage() {
 
       {tab === 'settings' && settings && (
         <div className="space-y-3">
+
+          {/* ── Round Management ─────────────────────────────────────── */}
+          {(() => {
+            const deadlines = parseDeadlines(settings.round_deadlines)
+            return (
+              <div className="glass-card p-4">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <p className="text-sm font-semibold">Round Management</p>
+                    <p className="text-xs text-ink-faint mt-0.5">
+                      {settings.current_round
+                        ? `Currently open: ${ROUNDS.find(r => r.num === settings.current_round)?.label ?? ''}`
+                        : 'No round currently open'}
+                    </p>
+                  </div>
+                  {settings.current_round && (
+                    <button
+                      onClick={() => updateSettings({ current_round: null })}
+                      className="text-xs text-red-400 hover:text-red-300 border border-red-500/30 px-3 py-1.5 rounded-xl transition"
+                    >
+                      Close round
+                    </button>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  {ROUNDS.map(r => {
+                    const savedDeadline = deadlines[String(r.num)] ?? ''
+                    const defaultInput = ROUND_DEADLINE_DEFAULTS[r.num] ?? ''
+
+                    const fxCount = fixtures.filter(f => Number(f.round) === r.num).length
+                    const resCount = results.filter(res => Number(res.round) === r.num).length
+                    const isOpen = settings.current_round === r.num
+                    const isFinished = fxCount > 0 && resCount >= fxCount
+                    const isDeadlinePast = savedDeadline ? new Date(savedDeadline).getTime() <= Date.now() : false
+
+                    const prevNum = r.num - 1
+                    const prevFxCount = prevNum > 0 ? fixtures.filter(f => Number(f.round) === prevNum).length : 1
+                    const prevResCount = prevNum > 0 ? results.filter(res => Number(res.round) === prevNum).length : 1
+                    const prevFinished = prevNum === 0 || (prevFxCount > 0 && prevResCount >= prevFxCount)
+                    const canOpen = !isOpen && !isFinished && prevFinished
+
+                    const status = isOpen ? 'open' : isFinished ? 'finished' : 'upcoming'
+
+                    return (
+                      <div
+                        key={r.num}
+                        className={`rounded-xl p-3 border space-y-2 ${
+                          isOpen ? 'border-pitch/30 bg-pitch-muted/20' : 'border-white/[0.06] bg-white/[0.02]'
+                        }`}
+                      >
+                        {/* Name + status badge */}
+                        <div className="flex items-center justify-between">
+                          <span className={`text-sm font-semibold ${isOpen ? 'text-pitch-light' : 'text-ink'}`}>
+                            {r.label}
+                          </span>
+                          {status === 'open' && (
+                            <span className="text-[10px] font-bold uppercase tracking-wide text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded-full">Open</span>
+                          )}
+                          {status === 'finished' && (
+                            <span className="text-[10px] font-bold uppercase tracking-wide text-ink-faint bg-white/[0.05] px-2 py-0.5 rounded-full">Finished</span>
+                          )}
+                          {status === 'upcoming' && (
+                            <span className="text-[10px] font-bold uppercase tracking-wide text-sky-400/70 bg-sky-400/10 px-2 py-0.5 rounded-full">Upcoming</span>
+                          )}
+                        </div>
+
+                        {/* Deadline */}
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] text-ink-faint shrink-0 w-12">Closes</span>
+                          <input
+                            key={`dl-${r.num}-${savedDeadline}`}
+                            type="datetime-local"
+                            defaultValue={savedDeadline ? toUKInputValue(savedDeadline) : defaultInput}
+                            id={`deadline-r${r.num}`}
+                            className="input-field-sm flex-1 text-xs"
+                          />
+                          <button
+                            onClick={() => {
+                              const el = document.getElementById(`deadline-r${r.num}`) as HTMLInputElement
+                              const iso = el?.value ? fromUKInputValue(el.value) : ''
+                              const updated = { ...parseDeadlines(settings.round_deadlines) }
+                              if (iso) updated[String(r.num)] = iso
+                              else delete updated[String(r.num)]
+                              updateSettings({ round_deadlines: JSON.stringify(updated) })
+                            }}
+                            className="btn-secondary text-xs px-2 py-1.5 shrink-0"
+                          >
+                            Save
+                          </button>
+                        </div>
+
+                        {/* Open button */}
+                        <button
+                          disabled={isOpen || isFinished}
+                          onClick={() => {
+                            if (!prevFinished && r.num > 1) {
+                              setRoundOpenError(r.num)
+                              setTimeout(() => setRoundOpenError(null), 5000)
+                              return
+                            }
+                            updateSettings({ current_round: r.num })
+                            setRoundOpenError(null)
+                          }}
+                          className={`w-full py-2 rounded-xl text-xs font-semibold transition border ${
+                            isOpen
+                              ? 'bg-pitch-gradient text-white border-pitch cursor-default'
+                              : isFinished
+                              ? 'border-white/[0.06] text-ink-faint cursor-default'
+                              : canOpen
+                              ? 'border-pitch/40 text-pitch-light hover:bg-pitch-muted/20'
+                              : 'border-white/[0.06] text-ink-faint/50 cursor-not-allowed'
+                          }`}
+                        >
+                          {isOpen ? '● Open now' : isFinished ? '✓ Finished' : 'Open Round'}
+                        </button>
+
+                        {/* Inline error */}
+                        {roundOpenError === r.num && (
+                          <p className="text-[11px] text-red-400">
+                            Round {r.num - 1} hasn&apos;t finished yet — enter all results before opening Round {r.num}
+                          </p>
+                        )}
+
+                        {/* Deadline passed warning */}
+                        {isDeadlinePast && isOpen && (
+                          <p className="text-[11px] text-amber-400">Deadline passed — picks are locked</p>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )
+          })()}
+
           <div className="glass-card p-4">
             <p className="text-sm font-semibold mb-3">Group stage entries</p>
             <div className="flex gap-2">
@@ -1149,36 +1293,6 @@ export default function AdminPage() {
             )})}
           </div>
 
-          <div className="glass-card p-4">
-            <p className="text-sm font-semibold mb-1">Pick deadlines</p>
-            <p className="text-xs text-ink-faint mb-3">Auto-set from API sync (earliest kick-off per round). All times in UK time (BST/GMT).</p>
-            <div className="space-y-2">
-              {ROUNDS.map(r => {
-                const deadlines = parseDeadlines(settings.round_deadlines)
-                const val = deadlines[String(r.num)] ?? ''
-                const isLocked = val ? new Date(val).getTime() <= Date.now() : false
-                return (
-                  <div key={r.num} className="flex items-center gap-2">
-                    <span className={`text-xs w-6 font-display font-bold shrink-0 ${isLocked ? 'text-red-400' : 'text-pitch-light'}`}>
-                      {r.short}
-                    </span>
-                    <input
-                      type="datetime-local"
-                      defaultValue={toUKInputValue(val)}
-                      onBlur={e => {
-                        const iso = e.target.value ? fromUKInputValue(e.target.value) : ''
-                        const updated = { ...parseDeadlines(settings.round_deadlines), [String(r.num)]: iso }
-                        if (!iso) delete updated[String(r.num)]
-                        updateSettings({ round_deadlines: JSON.stringify(updated) })
-                      }}
-                      className="input-field-sm flex-1 text-xs"
-                    />
-                    {isLocked && <span className="text-[10px] text-red-400 shrink-0">locked</span>}
-                  </div>
-                )
-              })}
-            </div>
-          </div>
 
           <div className="glass-card p-4">
             <p className="text-sm font-semibold mb-1">Golden Goal — actual total</p>
@@ -1230,65 +1344,6 @@ export default function AdminPage() {
             </button>
           </div>
 
-          {/* Current round control */}
-          <div className="glass-card p-4">
-            <p className="text-sm font-semibold mb-1">Current round</p>
-            <p className="text-xs text-ink-faint mb-3">
-              Set which round is currently open for picks. Participants see the pick form for this round on their personal dashboard.
-            </p>
-            <div className="flex gap-2 items-center mb-3">
-              <select
-                value={settings.current_round ?? ''}
-                onChange={e => {
-                  const val = e.target.value
-                  updateSettings({ current_round: val ? parseInt(val) : null })
-                }}
-                className="input-field-sm flex-1"
-              >
-                <option value="">— No round open —</option>
-                {ROUNDS.map(r => (
-                  <option key={r.num} value={r.num}>{r.label}</option>
-                ))}
-              </select>
-              <button
-                onClick={() => updateSettings({ current_round: null })}
-                className="btn-secondary text-xs px-3 py-2 text-red-400 hover:text-red-300"
-              >
-                Close
-              </button>
-            </div>
-            {/* Round status grid */}
-            <div className="space-y-1">
-              {(() => {
-                const deadlines = parseDeadlines(settings.round_deadlines)
-                return ROUNDS.map(r => {
-                  const isCurrent = settings.current_round === r.num
-                  const isLocked = deadlines[String(r.num)]
-                    ? new Date(deadlines[String(r.num)]).getTime() <= Date.now()
-                    : false
-                  return (
-                    <div
-                      key={r.num}
-                      className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs ${
-                        isCurrent ? 'bg-pitch-muted border border-pitch/20' : 'bg-white/[0.02]'
-                      }`}
-                    >
-                      <span className={`font-medium ${isCurrent ? 'text-pitch-light' : 'text-ink-muted'}`}>
-                        {r.label}
-                      </span>
-                      <span className={
-                        isCurrent ? 'text-emerald-400 font-semibold' :
-                        isLocked ? 'text-red-400/70' :
-                        'text-ink-faint'
-                      }>
-                        {isCurrent ? '● Open' : isLocked ? '🔒 Locked' : '—'}
-                      </span>
-                    </div>
-                  )
-                })
-              })()}
-            </div>
-          </div>
 
           <div className="glass-card p-4">
             <p className="text-sm font-semibold mb-1">Send round reminder</p>
