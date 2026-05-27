@@ -2,19 +2,57 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { entryPickPayload } from '@/lib/scoring'
 import { parseDeadlines, isRoundLocked } from '@/lib/round-deadlines'
+import { requireAdmin } from '@/lib/admin-auth'
 
 export async function GET(req: NextRequest) {
   const name = req.nextUrl.searchParams.get('name')
+
   if (name) {
+    // Individual lookup — always returns full data (player viewing their own picks)
     const { data } = await supabaseAdmin
       .from('entries')
       .select('*')
       .ilike('name', name)
-      .single()
+      .maybeSingle()
     return NextResponse.json({ entry: data })
   }
-  const { data } = await supabaseAdmin.from('entries').select('*').order('created_at')
-  return NextResponse.json({ entries: data || [] })
+
+  // All entries: check whether the caller is an admin
+  const authHeader = req.headers.get('authorization') ?? ''
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : ''
+
+  const { data: settings } = await supabaseAdmin.from('settings').select('*').single()
+
+  const isAdmin = Boolean(
+    token && settings?.admin_pass && token === settings.admin_pass
+  )
+
+  const { data: entries } = await supabaseAdmin
+    .from('entries')
+    .select('*')
+    .order('created_at')
+
+  if (isAdmin) {
+    // Admin sees everything unfiltered
+    return NextResponse.json({ entries: entries || [] })
+  }
+
+  // Public callers: null-out picks that haven't been revealed yet
+  const ROUND_FIELDS = [1, 2, 3, 4, 5, 6, 7, 8]
+  const filtered = (entries || []).map(entry => {
+    const e = { ...entry } as Record<string, unknown>
+    for (const r of ROUND_FIELDS) {
+      const showKey = `show_picks_r${r}`
+      if (!settings?.[showKey as keyof typeof settings]) {
+        e[`round${r}_team`] = null
+        e[`round${r}_my_goals`] = null
+        e[`round${r}_opp_goals`] = null
+      }
+    }
+    return e
+  })
+
+  return NextResponse.json({ entries: filtered })
 }
 
 export async function POST(req: NextRequest) {
@@ -110,8 +148,11 @@ export async function PUT(req: NextRequest) {
   return NextResponse.json({ entry: data })
 }
 
-/** PATCH: toggle paid status — admin only action */
+/** PATCH: toggle paid status — admin only */
 export async function PATCH(req: NextRequest) {
+  const auth = await requireAdmin(req)
+  if (!('ok' in auth)) return auth
+
   const { id, paid } = await req.json()
   if (!id) return NextResponse.json({ error: 'ID required' }, { status: 400 })
 
@@ -126,7 +167,11 @@ export async function PATCH(req: NextRequest) {
   return NextResponse.json({ entry: data })
 }
 
+/** DELETE: remove an entry — admin only */
 export async function DELETE(req: NextRequest) {
+  const auth = await requireAdmin(req)
+  if (!('ok' in auth)) return auth
+
   const id = req.nextUrl.searchParams.get('id')
   if (!id) return NextResponse.json({ error: 'ID required' }, { status: 400 })
   await supabaseAdmin.from('entries').delete().eq('id', id)

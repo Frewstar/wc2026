@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { requireAdmin } from '@/lib/admin-auth'
 
 export async function GET(req: NextRequest) {
   const token = req.nextUrl.searchParams.get('token')
+
   if (token) {
+    // Individual lookup by token — public, used by the /pick/[token] page
     const { data } = await supabaseAdmin
       .from('participants')
       .select('*')
@@ -12,6 +15,11 @@ export async function GET(req: NextRequest) {
     if (!data) return NextResponse.json({ error: 'Not found' }, { status: 404 })
     return NextResponse.json({ participant: data })
   }
+
+  // List all participants (includes tokens) — admin only
+  const auth = await requireAdmin(req)
+  if (!('ok' in auth)) return auth
+
   const { data } = await supabaseAdmin
     .from('participants')
     .select('*')
@@ -19,6 +27,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ participants: data || [] })
 }
 
+/** POST — public registration (used by /join page) */
 export async function POST(req: NextRequest) {
   const { name, email } = await req.json()
   if (!name?.trim()) return NextResponse.json({ error: 'Name is required' }, { status: 400 })
@@ -50,7 +59,11 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ participant: data })
 }
 
+/** DELETE — admin only */
 export async function DELETE(req: NextRequest) {
+  const auth = await requireAdmin(req)
+  if (!('ok' in auth)) return auth
+
   const id = req.nextUrl.searchParams.get('id')
   if (!id) return NextResponse.json({ error: 'ID required' }, { status: 400 })
   await supabaseAdmin.from('participants').delete().eq('id', id)

@@ -1,7 +1,8 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { Resend } from 'resend'
 import { supabaseAdmin } from '@/lib/supabase'
 import { ROUNDS, pickField } from '@/lib/rounds'
+import { requireAdmin } from '@/lib/admin-auth'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 const ADMIN_EMAIL = 'juggswc2026@gmail.com'
@@ -11,7 +12,14 @@ const ADMIN_EMAIL = 'juggswc2026@gmail.com'
  * Triggered daily by Vercel cron at 11pm.
  * Emails a CSV backup of all entries + participants to the admin.
  */
-export async function GET() {
+export async function GET(req: NextRequest) {
+  // Allow Vercel cron (which sends CRON_SECRET) and admin Bearer token
+  const cronSecret = req.headers.get('authorization')
+  const isCron = cronSecret === `Bearer ${process.env.CRON_SECRET}`
+  if (!isCron) {
+    const auth = await requireAdmin(req)
+    if (!('ok' in auth)) return auth
+  }
   const timestamp = new Date().toISOString().slice(0, 10)
 
   const [
@@ -72,15 +80,14 @@ export async function GET() {
     .map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(','))
     .join('\n')
 
-  // ── CSV 3: Participants ────────────────────────────────────────────────────
-  const partHeaders = ['Name', 'Email', 'Status', 'Registered', 'Paid At', 'Token']
+  // ── CSV 3: Participants (no token — tokens are personal pick links) ─────────
+  const partHeaders = ['Name', 'Email', 'Status', 'Registered', 'Paid At']
   const partRows = (participants || []).map(p => [
     p.name,
     p.email,
     p.status,
     new Date(p.created_at).toLocaleDateString('en-GB'),
     p.paid_at ? new Date(p.paid_at).toLocaleDateString('en-GB') : '',
-    p.token,
   ])
   const partCsv = [partHeaders, ...partRows]
     .map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(','))

@@ -1,13 +1,16 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { WC2026_GROUP_FIXTURES } from '@/lib/wc2026-fixtures'
+import { requireAdmin } from '@/lib/admin-auth'
 
-export async function POST() {
+export async function POST(req: NextRequest) {
+  const auth = await requireAdmin(req)
+  if (!('ok' in auth)) return auth
+
   let upserted = 0
-  let errors: string[] = []
+  const errors: string[] = []
 
   for (const fx of WC2026_GROUP_FIXTURES) {
-    // Try to find existing fixture by round + teams (either direction)
     const { data: byHome } = await supabaseAdmin
       .from('fixtures')
       .select('id, kickoff')
@@ -17,18 +20,13 @@ export async function POST() {
       .maybeSingle()
 
     if (byHome) {
-      // Update kickoff if it differs or is missing
       if (!byHome.kickoff || byHome.kickoff !== fx.kickoff) {
-        await supabaseAdmin
-          .from('fixtures')
-          .update({ kickoff: fx.kickoff })
-          .eq('id', byHome.id)
+        await supabaseAdmin.from('fixtures').update({ kickoff: fx.kickoff }).eq('id', byHome.id)
       }
       upserted++
       continue
     }
 
-    // Check reversed home/away (in case API stored them differently)
     const { data: byAway } = await supabaseAdmin
       .from('fixtures')
       .select('id, kickoff')
@@ -39,16 +37,12 @@ export async function POST() {
 
     if (byAway) {
       if (!byAway.kickoff || byAway.kickoff !== fx.kickoff) {
-        await supabaseAdmin
-          .from('fixtures')
-          .update({ kickoff: fx.kickoff })
-          .eq('id', byAway.id)
+        await supabaseAdmin.from('fixtures').update({ kickoff: fx.kickoff }).eq('id', byAway.id)
       }
       upserted++
       continue
     }
 
-    // Not found — insert fresh
     const { error } = await supabaseAdmin.from('fixtures').insert({
       round: fx.round,
       home_team: fx.home_team,

@@ -1,7 +1,11 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { runAdvanceWinners } from '@/lib/tournament-sync'
+import { requireAdmin } from '@/lib/admin-auth'
 
-export async function POST() {
+export async function POST(req: NextRequest) {
+  const auth = await requireAdmin(req)
+  if (!('ok' in auth)) return auth
+
   try {
     const applied = await runAdvanceWinners()
     return NextResponse.json({ applied })

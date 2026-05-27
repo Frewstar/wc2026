@@ -4,6 +4,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { ROUNDS, pickField } from '@/lib/rounds'
 import { parseDeadlines } from '@/lib/round-deadlines'
 import { formatUKKickoff } from '@/lib/uk-time'
+import { requireAdmin } from '@/lib/admin-auth'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
@@ -92,6 +93,9 @@ function buildReminderHtml(name: string, link: string, roundLabel: string, deadl
 }
 
 export async function POST(req: NextRequest) {
+  const auth = await requireAdmin(req)
+  if (!('ok' in auth)) return auth
+
   const { round } = await req.json()
   if (!round) return NextResponse.json({ error: 'round required' }, { status: 400 })
 

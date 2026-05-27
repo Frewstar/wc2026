@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { runAdvanceWinners } from '@/lib/tournament-sync'
+import { requireAdmin } from '@/lib/admin-auth'
 
 export async function GET() {
   const { data } = await supabaseAdmin.from('results').select('*').order('round')
@@ -8,6 +9,9 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  const auth = await requireAdmin(req)
+  if (!('ok' in auth)) return auth
+
   const { round, home_team, away_team, home_goals, away_goals, winner_team, auto_advance } =
     await req.json()
 

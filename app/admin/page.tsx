@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { TEAMS, type Entry, type Fixture, type Result, type Settings, calcPoints } from '@/lib/scoring'
 import { getTeamGroup } from '@/lib/wc-groups'
@@ -57,10 +57,25 @@ export default function AdminPage() {
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 3000) }
 
+  // Admin token stored in memory only — never persisted to localStorage
+  const adminToken = useRef('')
+
+  // Wraps every admin API call with the Bearer token header
+  const adminFetch = useCallback((url: string, opts: RequestInit = {}) => {
+    return fetch(url, {
+      ...opts,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(opts.headers as Record<string, string> ?? {}),
+        Authorization: `Bearer ${adminToken.current}`,
+      },
+    })
+  }, [])
+
   const runSync = async (silent = false) => {
     if (!silent) setSyncing(true)
     try {
-      const res = await fetch('/api/sync-results')
+      const res = await adminFetch('/api/sync-results')
       const data = await res.json()
       await loadAll()
       setLastSynced(new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' }))
@@ -84,12 +99,12 @@ export default function AdminPage() {
 
   const loadAll = async () => {
     const [e, f, r, s, p, pt] = await Promise.all([
-      fetch('/api/entries').then(x => x.json()),
+      adminFetch('/api/entries').then(x => x.json()),        // auth → unfiltered picks
       fetch('/api/fixtures').then(x => x.json()),
       fetch('/api/results').then(x => x.json()),
       fetch('/api/settings').then(x => x.json()),
       fetch('/api/players').then(x => x.json()),
-      fetch('/api/participants').then(x => x.json()),
+      adminFetch('/api/participants').then(x => x.json()),   // auth → includes tokens
     ])
     setEntries(e.entries || [])
     setFixtures(f.fixtures || [])
@@ -100,20 +115,28 @@ export default function AdminPage() {
   }
 
   const handleLogin = async () => {
-    const s = await fetch('/api/settings').then(r => r.json())
-    if (passInput === s.settings?.admin_pass) {
-      setSettings(s.settings)
-      setUnlocked(true)
-      loadAll()
-    } else {
-      setPassError('Incorrect password')
+    setPassError('')
+    try {
+      const res = await fetch('/api/admin/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: passInput }),
+      })
+      if (res.ok) {
+        adminToken.current = passInput
+        setUnlocked(true)
+        loadAll()
+      } else {
+        setPassError('Incorrect password')
+      }
+    } catch {
+      setPassError('Network error — try again')
     }
   }
 
   const updateSettings = async (patch: Partial<Settings>) => {
-    await fetch('/api/settings', {
+    await adminFetch('/api/settings', {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(patch),
     })
     await loadAll()
@@ -123,9 +146,8 @@ export default function AdminPage() {
   const confirmPayment = async (id: string) => {
     setConfirmingId(id)
     try {
-      const res = await fetch('/api/participants/confirm-payment', {
+      const res = await adminFetch('/api/participants/confirm-payment', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id }),
       })
       const data = await res.json()
@@ -140,9 +162,8 @@ export default function AdminPage() {
   const resendEmail = async (participant: Participant) => {
     setResendingId(participant.id)
     try {
-      const res = await fetch('/api/participants/confirm-payment', {
+      const res = await adminFetch('/api/participants/confirm-payment', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: participant.id }),
       })
       const data = await res.json()
@@ -164,9 +185,8 @@ export default function AdminPage() {
   const sendReminder = async () => {
     setReminding(true)
     try {
-      const res = await fetch('/api/participants/remind', {
+      const res = await adminFetch('/api/participants/remind', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ round: reminderRound }),
       })
       const data = await res.json()
@@ -180,9 +200,8 @@ export default function AdminPage() {
   const addPlayer = async () => {
     const trimmed = playerInput.trim()
     if (!trimmed) { showToast('Enter a name'); return }
-    const res = await fetch('/api/players', {
+    const res = await adminFetch('/api/players', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: trimmed }),
     })
     if (!res.ok) { const d = await res.json(); showToast(d.error || 'Error'); return }
@@ -192,7 +211,7 @@ export default function AdminPage() {
   }
 
   const deletePlayer = async (id: string) => {
-    await fetch(`/api/players?id=${id}`, { method: 'DELETE' })
+    await adminFetch(`/api/players?id=${id}`, { method: 'DELETE' })
     await loadAll()
     showToast('Player removed')
   }
@@ -200,9 +219,8 @@ export default function AdminPage() {
   const addFixture = async () => {
     if (!fxHome || !fxAway) { showToast('Select both teams'); return }
     if (fxHome === fxAway) { showToast('Teams must be different'); return }
-    await fetch('/api/fixtures', {
+    await adminFetch('/api/fixtures', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ round: fxRound, home_team: fxHome, away_team: fxAway }),
     })
     setFxHome(''); setFxAway('')
@@ -211,7 +229,7 @@ export default function AdminPage() {
   }
 
   const deleteFixture = async (id: string) => {
-    await fetch(`/api/fixtures?id=${id}`, { method: 'DELETE' })
+    await adminFetch(`/api/fixtures?id=${id}`, { method: 'DELETE' })
     await loadAll()
     showToast('Fixture removed')
   }
@@ -224,9 +242,8 @@ export default function AdminPage() {
     const hG = resEdits[hKey] ?? existing?.home_goals ?? 0
     const aG = resEdits[aKey] ?? existing?.away_goals ?? 0
     const winner = winnerEdits[wKey] ?? existing?.winner_team ?? null
-    await fetch('/api/results', {
+    await adminFetch('/api/results', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         round: fix.round,
         home_team: fix.home_team,
@@ -244,7 +261,7 @@ export default function AdminPage() {
 
   const advanceBracket = async () => {
     setAdvancing(true)
-    const res = await fetch('/api/advance-bracket', { method: 'POST' })
+    const res = await adminFetch('/api/advance-bracket', { method: 'POST' })
     const data = await res.json()
     await loadAll()
     setAdvancing(false)
@@ -253,7 +270,7 @@ export default function AdminPage() {
 
   const seedGroupFixtures = async () => {
     setSeeding(true)
-    const res = await fetch('/api/seed-fixtures', { method: 'POST' })
+    const res = await adminFetch('/api/seed-fixtures', { method: 'POST' })
     const data = await res.json()
     await loadAll()
     setSeeding(false)
@@ -266,7 +283,7 @@ export default function AdminPage() {
 
   const buildKnockout = async () => {
     setBuilding(true)
-    const res = await fetch('/api/build-knockout', { method: 'POST' })
+    const res = await adminFetch('/api/build-knockout', { method: 'POST' })
     const data = await res.json()
     await loadAll()
     setBuilding(false)
@@ -282,15 +299,14 @@ export default function AdminPage() {
 
   const deleteEntry = async (id: string) => {
     if (!confirm('Delete this entry?')) return
-    await fetch(`/api/entries?id=${id}`, { method: 'DELETE' })
+    await adminFetch(`/api/entries?id=${id}`, { method: 'DELETE' })
     await loadAll()
     showToast('Entry deleted')
   }
 
   const setJoker = async (entryId: string, jokerRound: number | null) => {
-    const res = await fetch('/api/admin/set-joker', {
+    const res = await adminFetch('/api/admin/set-joker', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ entry_id: entryId, joker_round: jokerRound }),
     })
     const data = await res.json()
@@ -439,9 +455,8 @@ export default function AdminPage() {
         const unpaid = entries.filter(e => !e.paid)
 
         const togglePaid = async (entry: Entry) => {
-          await fetch('/api/entries', {
+          await adminFetch('/api/entries', {
             method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ id: entry.id, paid: !entry.paid }),
           })
           await loadAll()
@@ -451,9 +466,8 @@ export default function AdminPage() {
         const markAllPaid = async () => {
           if (!confirm(`Mark all ${unpaid.length} unpaid entries as paid?`)) return
           await Promise.all(unpaid.map(e =>
-            fetch('/api/entries', {
+            adminFetch('/api/entries', {
               method: 'PATCH',
-              headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ id: e.id, paid: true }),
             })
           ))
@@ -591,7 +605,7 @@ export default function AdminPage() {
                           <button
                             onClick={() => {
                               if (confirm(`Delete ${p.name}?`)) {
-                                fetch(`/api/participants?id=${p.id}`, { method: 'DELETE' }).then(() => loadAll())
+                                adminFetch(`/api/participants?id=${p.id}`, { method: 'DELETE' }).then(() => loadAll())
                               }
                             }}
                             className="text-red-400/60 text-xs hover:text-red-400 transition-colors"
@@ -655,7 +669,7 @@ export default function AdminPage() {
                             <button
                               onClick={() => {
                                 if (confirm(`Remove ${p.name}?`)) {
-                                  fetch(`/api/participants?id=${p.id}`, { method: 'DELETE' }).then(() => loadAll())
+                                  adminFetch(`/api/participants?id=${p.id}`, { method: 'DELETE' }).then(() => loadAll())
                                 }
                               }}
                               className="text-red-400/60 text-xs hover:text-red-400 transition-colors"
