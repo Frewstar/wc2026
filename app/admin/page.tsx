@@ -55,6 +55,7 @@ export default function AdminPage() {
   const [demoPickUrl, setDemoPickUrl] = useState<string | null>(null)
   const [demoClearing, setDemoClearing] = useState(false)
   const [roundOpenError, setRoundOpenError] = useState<number | null>(null)
+  const [savingSnapshot, setSavingSnapshot] = useState(false)
   const autoSyncRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const [toast, setToast] = useState('')
   const [winnerEdits, setWinnerEdits] = useState<Record<string, string>>({})
@@ -262,6 +263,21 @@ export default function AdminPage() {
   }
 
   const syncResults = () => runSync(false)
+
+  const saveSnapshot = async () => {
+    setSavingSnapshot(true)
+    try {
+      const res = await adminFetch('/api/leaderboard/snapshot', { method: 'POST' })
+      const data = await res.json()
+      if (res.ok) {
+        showToast(`📸 Snapshot saved — ${data.saved} players, Round ${data.round}`)
+      } else {
+        showToast(`Error: ${data.error ?? 'Failed to save snapshot'}`)
+      }
+    } finally {
+      setSavingSnapshot(false)
+    }
+  }
 
   const advanceBracket = async () => {
     setAdvancing(true)
@@ -996,6 +1012,14 @@ export default function AdminPage() {
               className="btn-secondary text-xs px-3 py-2 disabled:opacity-50"
             >
               {advancing ? 'Advancing…' : 'Advance winners'}
+            </button>
+            <button
+              onClick={saveSnapshot}
+              disabled={savingSnapshot || !settings?.current_round}
+              className="btn-secondary text-xs px-3 py-2 disabled:opacity-50"
+              title="Save current leaderboard positions — used to show ↑↓ movement arrows"
+            >
+              {savingSnapshot ? 'Saving…' : '📸 Save snapshot'}
             </button>
           </div>
           <SegmentedControl

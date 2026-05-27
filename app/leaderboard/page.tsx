@@ -15,6 +15,7 @@ type Player = { id: string; name: string }
 
 type RankSnapshot = { rank: number; total: number }
 type RankAnimation = { rankDelta: number; pointsDelta: number }
+type SnapshotEntry = { position: number; points: number }
 
 const POLL_MS = 25_000
 
@@ -26,6 +27,7 @@ export default function LeaderboardPage() {
   const [loading, setLoading] = useState(true)
   const [animating, setAnimating] = useState<Record<string, RankAnimation>>({})
   const [showEnterAnim, setShowEnterAnim] = useState(true)
+  const [snapshotMap, setSnapshotMap] = useState<Record<string, SnapshotEntry>>({})
 
   const prevRanks = useRef<Record<string, RankSnapshot>>({})
   const isFirstLoad = useRef(true)
@@ -58,18 +60,25 @@ export default function LeaderboardPage() {
   }, [])
 
   const fetchData = useCallback(async (isInitial = false) => {
-    const [e, r, s, p] = await Promise.all([
-      fetch('/api/entries').then(res => res.json()),
-      fetch('/api/results').then(res => res.json()),
-      fetch('/api/settings').then(res => res.json()),
-      fetch('/api/players').then(res => res.json()),
-    ])
+    const fetches: Promise<Response>[] = [
+      fetch('/api/entries'),
+      fetch('/api/results'),
+      fetch('/api/settings'),
+      fetch('/api/players'),
+    ]
+    if (isInitial) fetches.push(fetch('/api/leaderboard/snapshot'))
+
+    const responses = await Promise.all(fetches.map(f => f.then(r => r.json())))
+    const [e, r, s, p, snap] = responses
     const newEntries: Entry[] = e.entries || []
     const newResults: Result[] = r.results || []
     setEntries(newEntries)
     setResults(newResults)
     setSettings(s.settings)
     setPlayers(p.players || [])
+    if (isInitial && snap?.snapshot) {
+      setSnapshotMap(snap.snapshot as Record<string, SnapshotEntry>)
+    }
 
     const actualGoals = s.settings?.actual_golden_goal ?? null
     const ranked = newEntries
@@ -195,6 +204,8 @@ export default function LeaderboardPage() {
                 const rowAnim = anim
                   ? anim.rankDelta > 0 ? 'leaderboard-row-up' : anim.rankDelta < 0 ? 'leaderboard-row-down' : ''
                   : showEnterAnim ? 'leaderboard-row-enter' : ''
+                const snap = snapshotMap[e.name]
+                const snapDelta = snap ? snap.position - (idx + 1) : 0  // positive = moved up
 
                 return (
                   <tr
@@ -212,8 +223,15 @@ export default function LeaderboardPage() {
                             {inTiedGroup && !tiedWithPrev ? 'T' : inTiedGroup ? '' : idx + 1}
                           </span>
                         )}
+                        {/* Between-poll movement arrows */}
                         {anim && anim.rankDelta > 0 && <IconTrendUp className="w-3 h-3 text-pitch-light animate-fade-in" />}
                         {anim && anim.rankDelta < 0 && <IconTrendDown className="w-3 h-3 text-red-400 animate-fade-in" />}
+                        {/* Snapshot position-change badge (shown when no between-poll anim) */}
+                        {!anim && snapDelta !== 0 && (
+                          <span className={`text-[9px] font-bold tabular-nums leading-none ${snapDelta > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                            {snapDelta > 0 ? `↑${snapDelta}` : `↓${Math.abs(snapDelta)}`}
+                          </span>
+                        )}
                       </div>
                     </td>
 

@@ -333,3 +333,32 @@
   animation: scoreCueBounce 0.65s ease-in-out 4;
   animation-fill-mode: forwards;
 }
+
+/* ── Engagement feature animations ─────────────────────────────────────── */
+
+@keyframes countdownUrgent {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.65; }
+}
+
+.animate-countdown-urgent {
+  animation: countdownUrgent 0.9s ease-in-out infinite;
+}
+
+@keyframes celebrateEnter {
+  from { opacity: 0; transform: scale(0.75); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+.animate-celebrate-enter {
+  animation: celebrateEnter 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(28px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.animate-slide-up {
+  animation: slideUp 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}

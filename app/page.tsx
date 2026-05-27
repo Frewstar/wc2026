@@ -2,6 +2,8 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { IconTrophy, IconScoreboard, IconSettings, IconRules, IconCalendar, IconExternalLink } from '@/components/icons'
+import { CountdownHero } from '@/components/CountdownHero'
+import type { Settings } from '@/lib/scoring'
 
 function WhatsAppIcon() {
   return (
@@ -19,12 +21,16 @@ export default function Home() {
   const [regState, setRegState] = useState<RegistrationState>('idle')
   const [errorMsg, setErrorMsg] = useState('')
   const [waGroupUrl, setWaGroupUrl] = useState<string | null>(null)
+  const [settings, setSettings] = useState<Settings | null>(null)
 
   useEffect(() => {
     fetch('/api/settings')
       .then(r => r.json())
       .then(d => {
-        if (d.settings?.whatsapp_group_url) setWaGroupUrl(d.settings.whatsapp_group_url)
+        if (d.settings) {
+          setSettings(d.settings)
+          if (d.settings.whatsapp_group_url) setWaGroupUrl(d.settings.whatsapp_group_url)
+        }
       })
   }, [])
 
@@ -62,6 +68,7 @@ export default function Home() {
 
   return (
     <div className="space-y-5">
+      <CountdownHero settings={settings} />
       <div className="glass-card p-6">
         {regState === 'success' ? (
           <div className="text-center py-2">

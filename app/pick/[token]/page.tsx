@@ -15,6 +15,8 @@ import { getTeamGroup } from '@/lib/wc-groups'
 import { PageHeader, LoadingState } from '@/components/ui'
 import { IconLock, IconTrophy } from '@/components/icons'
 import { TeamFlag, TeamMatchup } from '@/components/TeamFlag'
+import { CountdownHero } from '@/components/CountdownHero'
+import { ShareCard, type ShareData } from '@/components/ShareCard'
 
 type Participant = {
   id: string
@@ -562,6 +564,8 @@ export default function PickPage() {
   const [notFound, setNotFound] = useState(false)
   const [pickSuccess, setPickSuccess] = useState(false)
   const [showEditForm, setShowEditForm] = useState(false)
+  const [shareData, setShareData] = useState<ShareData | null>(null)
+  const pickFormRef = useRef<HTMLDivElement>(null)
 
   const loadData = useCallback(async () => {
     if (!token) return
@@ -594,8 +598,31 @@ export default function PickPage() {
 
   const handlePickSuccess = (updated: Entry) => {
     setEntry(updated)
-    setPickSuccess(true)
     setShowEditForm(false)
+    // Build share data for the overlay
+    const cr = settings?.current_round ?? null
+    const crDef = cr ? ROUNDS.find(r => r.num === cr) ?? null : null
+    if (cr && crDef) {
+      const pickedTeam = updated[pickField(cr, 'team') as keyof Entry] as string | null
+      const myGoals = (updated[pickField(cr, 'my_goals') as keyof Entry] as number) ?? 0
+      const oppGoals = (updated[pickField(cr, 'opp_goals') as keyof Entry] as number) ?? 0
+      const opp = fixtures.find(fx => fx.round === cr && pickedTeam && (fx.home_team === pickedTeam || fx.away_team === pickedTeam))
+      const opponent = opp && pickedTeam ? (opp.home_team === pickedTeam ? opp.away_team : opp.home_team) : null
+      if (pickedTeam) {
+        setShareData({
+          team: pickedTeam,
+          myGoals,
+          oppGoals,
+          opponent,
+          roundLabel: crDef.label,
+          roundNum: cr,
+          joker: updated.joker_round === cr,
+        })
+        return
+      }
+    }
+    // Fallback: no share card, just show success toast
+    setPickSuccess(true)
     setTimeout(() => setPickSuccess(false), 4000)
   }
 
@@ -654,6 +681,18 @@ export default function PickPage() {
 
   return (
     <div className="space-y-5">
+      {/* Feature 3: share card overlay */}
+      {shareData && (
+        <ShareCard
+          data={shareData}
+          onDismiss={() => {
+            setShareData(null)
+            setPickSuccess(true)
+            setTimeout(() => setPickSuccess(false), 4000)
+          }}
+        />
+      )}
+
       <PageHeader
         title={participant.name}
         subtitle="Your picks dashboard"
@@ -703,6 +742,26 @@ export default function PickPage() {
         </div>
       </div>
 
+      {/* Feature 1: countdown hero */}
+      <CountdownHero settings={settings} entry={entry} />
+
+      {/* Feature 2: haven't picked banner */}
+      {currentRoundDef && !isCurrentLocked && !hasPickedCurrentRound && (
+        <button
+          onClick={() => pickFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+          className="w-full flex items-center gap-3 bg-amber-500/10 border border-amber-500/30 rounded-2xl px-4 py-3 text-left hover:bg-amber-500/15 transition-colors"
+        >
+          <span className="text-xl shrink-0">⚠️</span>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-amber-300">You haven&apos;t picked yet!</p>
+            <p className="text-xs text-amber-400/70 mt-0.5">Tap to scroll to your {currentRoundDef.label} pick</p>
+          </div>
+          <svg className="w-4 h-4 text-amber-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+      )}
+
       {/* Success toast */}
       {pickSuccess && (
         <div className="alert-success font-semibold">✅ Pick saved!</div>
@@ -710,7 +769,7 @@ export default function PickPage() {
 
       {/* Current round — pick form or status */}
       {currentRoundDef && (
-        <div className="glass-card p-5">
+        <div ref={pickFormRef} className="glass-card p-5 scroll-mt-4">
           <div className="flex items-center justify-between mb-4">
             <p className="section-label">{currentRoundDef.label}</p>
             {isCurrentLocked ? (
